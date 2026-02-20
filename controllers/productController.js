@@ -1,6 +1,6 @@
 const Product = require('../models/Product');
 const Category = require('../models/Category');
-const APIFeatures = require('../utils/apiFeatures');
+const APIFeatures = require('../utils/APIFeatures');
 
 // const validateVariations = (variations) => {
 //   if (!Array.isArray(variations)) return true;

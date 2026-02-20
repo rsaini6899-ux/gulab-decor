@@ -1,6 +1,6 @@
 const Customer = require('../models/Customer');
 const Order = require('../models/Order');
-const APIFeatures = require('../utils/apiFeatures');
+const APIFeatures = require('../utils/APIFeatures');
 
 exports.getAllCustomers = async (req, res, next) => {
   try {

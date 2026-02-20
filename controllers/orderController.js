@@ -2,7 +2,7 @@ const Order = require('../models/Order');
 const Customer = require('../models/User');
 
 const Product = require('../models/Product');
-const APIFeatures = require('../utils/apiFeatures');
+const APIFeatures = require('../utils/APIFeatures');
 
 const Cart = require('../models/cart');
 const User = require('../models/User');
