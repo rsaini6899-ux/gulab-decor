@@ -517,7 +517,6 @@ exports.login = async (req, res, next) => {
 exports.getMe = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
-    
     res.status(200).json({
       success: true,
       user
@@ -527,23 +526,59 @@ exports.getMe = async (req, res, next) => {
   }
 };
 
-exports.updateProfile = async (req, res, next) => {
+exports.updateProfile = async (req, res) => {
   try {
-    const { name, email, phone, avatar } = req.body;
-    
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      { name, email, phone, avatar },
-      { new: true, runValidators: true }
-    );
+    const userId = req.user.id;
+    const { name, email, phone, address, city, state, pincode, landmark } = req.body;
+
+    console.log('Updating profile for user:', userId);
+    console.log('Update data:', { name, email, phone, address, city, state, pincode, landmark });
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Update fields - ये सभी fields userSchema mein होने चाहिए
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (phone) user.phone = phone;
+    if (address) user.address = address;
+    if (city) user.city = city;
+    if (state) user.state = state;
+    if (pincode) user.pincode = pincode;
+    if (landmark) user.landmark = landmark;
+
+    await user.save();
 
     res.status(200).json({
       success: true,
       message: 'Profile updated successfully',
-      user
+      data: {
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          address: user.address,
+          city: user.city,
+          state: user.state,
+          pincode: user.pincode,
+          landmark: user.landmark,
+        }
+      }
     });
+
   } catch (error) {
-    next(error);
+    console.error('Update profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update profile'
+    });
   }
 };
 

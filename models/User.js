@@ -72,6 +72,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       maxlength: [50, "Country cannot exceed 50 characters"],
     },
+      landmark: {
+      type: String,
+      maxlength: [100, "Landmark cannot exceed 100 characters"],
+    },
     resetPasswordToken: String,
     resetPasswordExpire: Date,
   },

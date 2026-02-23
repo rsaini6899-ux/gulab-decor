@@ -4,6 +4,17 @@ const authController = require('../controllers/authController');
 const authMiddleware = require('../middleware/auth');
 const upload = require('../middleware/upload');
 
+const {
+  sendSmsOTP,
+  verifySmsOTP,
+  resendSmsOTP,
+} = require('../controllers/otpController');
+
+// Public routes
+router.post('/send/sms-otp', sendSmsOTP);
+router.post('/verify/sms-otp', verifySmsOTP);
+router.post('/resend/sms-otp', resendSmsOTP);
+
 router.post('/upload-image', 
   upload.single('avatar'),
   upload.processImage('auth'), 
