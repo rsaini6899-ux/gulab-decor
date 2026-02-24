@@ -105,13 +105,6 @@ exports.addItemToWishlist = async (req, res) => {
   try {
     const userId = req.user._id;
     const { productId, variationId } = req.body;
-
-    console.log("Received wishlist request:", {
-      userId,
-      productId,
-      variationId,
-      body: req.body
-    });
     
     // Validation
     if (!productId || !variationId) {

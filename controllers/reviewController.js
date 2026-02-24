@@ -4,9 +4,6 @@ const Product = require('../models/Product');
 // Create new review
 exports.createReview = async (req, res, next) => {
   try {
-    console.log('⭐ Creating new review...');
-    console.log('Request body:', req.body);
-    console.log('Files:', req.files);
 
     // Validate required fields
     const { title, content, rating, author } = req.body;
@@ -54,12 +51,8 @@ exports.createReview = async (req, res, next) => {
       createdBy: req.user ? req.user.id : null
     };
 
-    console.log('✅ Review data prepared:', reviewData);
-
     // Create review
     const review = await Review.create(reviewData);
-
-    console.log('✅ Review created:', review._id);
 
     res.status(201).json({
       success: true,
@@ -234,8 +227,6 @@ exports.getReviewById = async (req, res, next) => {
 // Update review
 exports.updateReview = async (req, res, next) => {
   try {
-    console.log('✏️ Updating review:', req.params.id);
-    console.log('Request body:', req.body);
 
     let review = await Review.findById(req.params.id);
 
@@ -278,8 +269,6 @@ exports.updateReview = async (req, res, next) => {
         updateData.author = { name: req.body.author };
       }
     }
-
-    console.log('✅ Update data:', updateData);
 
     // Update review
     review = await Review.findByIdAndUpdate(
@@ -355,8 +344,6 @@ exports.markHelpful = async (req, res, next) => {
 // Upload review images
 exports.uploadReviewImages = async (req, res, next) => {
   try {
-    console.log('📤 Uploading review images...');
-    console.log('Files:', req.files);
 
     if (!req.files || !req.files.images) {
       return res.status(400).json({
@@ -372,8 +359,6 @@ exports.uploadReviewImages = async (req, res, next) => {
       size: file.size,
       mimetype: file.mimetype
     }));
-
-    console.log('📄 Images uploaded:', images.length);
 
     res.status(200).json({
       success: true,

@@ -127,10 +127,6 @@ exports.getBanner = async (req, res, next) => {
 // Create new banner
 exports.createBanner = async (req, res, next) => {
   try {
-    console.log('🎨 Creating new banner...');
-    console.log('Request body:', req.body);
-    console.log('Files:', req.files);
-
     // Validate required fields
     const { title } = req.body;
     if (!title) {
@@ -182,12 +178,8 @@ exports.createBanner = async (req, res, next) => {
       createdBy: req.user.id
     };
 
-    console.log('✅ Banner data prepared:', bannerData);
-
     // Create banner
     const banner = await Banner.create(bannerData);
-
-    console.log('✅ Banner created:', banner._id);
 
     res.status(201).json({
       success: true,
@@ -212,8 +204,6 @@ exports.createBanner = async (req, res, next) => {
 // Update banner
 exports.updateBanner = async (req, res, next) => {
   try {
-    console.log('✏️ Updating banner:', req.params.id);
-    console.log('Request body:', req.body);
 
     let banner = await Banner.findById(req.params.id);
 
@@ -257,8 +247,6 @@ exports.updateBanner = async (req, res, next) => {
       }
     });
 
-    console.log('✅ Update data:', updateData);
-
     // Update banner
     banner = await Banner.findByIdAndUpdate(
       req.params.id,
@@ -284,7 +272,6 @@ exports.updateBanner = async (req, res, next) => {
 // Delete banner
 exports.deleteBanner = async (req, res, next) => {
   try {
-    console.log('🗑️ Deleting banner:', req.params.id);
 
     const banner = await Banner.findById(req.params.id);
 
@@ -314,8 +301,6 @@ exports.deleteBanner = async (req, res, next) => {
 // Upload banner image
 exports.uploadBannerImage = async (req, res, next) => {
   try {
-    console.log('📤 Uploading banner image...');
-    console.log('Files:', req.files);
 
     if (!req.files || !req.files.image) {
       return res.status(400).json({
@@ -325,14 +310,6 @@ exports.uploadBannerImage = async (req, res, next) => {
     }
 
     const imageFile = req.files.image[0];
-    
-    console.log('📄 Image uploaded:', {
-      filename: imageFile.filename,
-      folder: imageFile.folder,
-      url: imageFile.fullUrl,
-      size: imageFile.size,
-      mimetype: imageFile.mimetype
-    });
 
     res.status(200).json({
       success: true,

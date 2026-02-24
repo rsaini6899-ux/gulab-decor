@@ -44,12 +44,8 @@ exports.createBlog = async (req, res, next) => {
       metaTitle: req.body.metaTitle,
     };
 
-    console.log('✅ Blog data prepared:', blogData);
-
     // Create blog
     const blog = await Blog.create(blogData);
-
-    console.log('✅ Blog created:', blog._id);
 
     res.status(201).json({
       success: true,
@@ -186,9 +182,6 @@ exports.getBlogById = async (req, res, next) => {
 // Update blog
 exports.updateBlog = async (req, res, next) => {
   try {
-    console.log('✏️ Updating blog:', req.params.id);
-    console.log('Request body:', req.body);
-
     let blog = await Blog.findById(req.params.id);
 
     if (!blog) {
@@ -210,8 +203,6 @@ exports.updateBlog = async (req, res, next) => {
 
     // Prepare update data
     const updateData = { ...req.body };
-
-    console.log('✅ Update data:', updateData);
 
     // Update blog
     blog = await Blog.findByIdAndUpdate(
@@ -266,9 +257,6 @@ exports.deleteBlog = async (req, res, next) => {
 // Upload blog image
 exports.uploadBlogImage = async (req, res, next) => {
   try {
-    console.log('📤 Uploading blog image...');
-    console.log('Files:', req.files);
-
     if (!req.files || !req.files.image) {
       return res.status(400).json({
         success: false,
@@ -277,14 +265,6 @@ exports.uploadBlogImage = async (req, res, next) => {
     }
 
     const imageFile = req.files.image[0];
-    
-    console.log('📄 Image uploaded:', {
-      filename: imageFile.filename,
-      folder: imageFile.folder,
-      url: imageFile.fullUrl,
-      size: imageFile.size,
-      mimetype: imageFile.mimetype
-    });
 
     res.status(200).json({
       success: true,

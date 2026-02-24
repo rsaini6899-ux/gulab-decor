@@ -18,8 +18,6 @@ exports.createCoupon = async (req, res, next) => {
       isActive,
       color
     } = req.body;
-
-    console.log('Received data:', req.body);
     
     // Validate title length
     if (title && title.length < 3) {
@@ -100,8 +98,7 @@ exports.createCoupon = async (req, res, next) => {
 
 // Get all coupons with filtering, pagination, and stats
 exports.getAllCoupons = async (req, res, next) => {
-
-  console.log('Query parameters');
+  
   const { 
     page = 1, 
     limit = 10, 

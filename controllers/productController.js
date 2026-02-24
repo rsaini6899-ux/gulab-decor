@@ -497,7 +497,6 @@ exports.getProductById = async (req, res, next) => {
 // Create new product
 exports.createProduct = async (req, res, next) => {
   try {
-    console.log('📦 Creating new product...');
 
     // Check if SKU already exists
     if (req.body.sku) {
@@ -633,8 +632,6 @@ exports.createProduct = async (req, res, next) => {
       }
     });
     
-    console.log('✅ Product data to create:', productData);
-    
     // Create product
     const product = await Product.create(productData);
     
@@ -692,21 +689,15 @@ const updateCategoryVariationValues = async (categoryId, variations) => {
       return;
     }
     
-    console.log('🔄 Updating category variation values for category:', categoryId);
-    console.log('Variations data:', variations);
-    
     // Extract all non-color attribute values from variations
     const variationTypeValues = {};
     
     variations.forEach(variation => {
       const attributes = variation.attributes || [];
-      console.log('Processing variation attributes:', attributes);
       
       const nonColorAttributes = attributes.filter(attr => 
         attr.name && attr.name.toLowerCase() !== 'color' && attr.value
       );
-      
-      console.log('Non-color attributes:', nonColorAttributes);
       
       nonColorAttributes.forEach(attr => {
         if (attr.name && attr.value) {
@@ -718,8 +709,6 @@ const updateCategoryVariationValues = async (categoryId, variations) => {
       });
     });
     
-    console.log('Extracted variation type values:', variationTypeValues);
-    
     // Update category variation types with values
     const updatedVariationTypes = category.variationTypes.map(type => {
       const existingValues = type.values || [];
@@ -729,8 +718,6 @@ const updateCategoryVariationValues = async (categoryId, variations) => {
       
       // Merge and deduplicate values
       const mergedValues = [...new Set([...existingValues, ...newValues])];
-      
-      console.log(`For ${type.name}: existing=${existingValues}, new=${newValues}, merged=${mergedValues}`);
       
       return {
         name: type.name,
@@ -743,7 +730,6 @@ const updateCategoryVariationValues = async (categoryId, variations) => {
     category.variationTypes = updatedVariationTypes;
     await category.save();
     
-    console.log('✅ Updated category variation values:', updatedVariationTypes);
   } catch (error) {
     console.error('❌ Error updating category variation values:', error);
   }
@@ -893,9 +879,6 @@ exports.updateProduct = async (req, res, next) => {
       });
       
       req.body.variations = cleanedVariations;
-      
-      console.log('✅ Updated colorImages:', colorImagesArray.length, 'colors');
-      console.log('✅ Updated variations count:', cleanedVariations.length);
     }
     
     // Remove undefined values
@@ -904,12 +887,7 @@ exports.updateProduct = async (req, res, next) => {
         delete req.body[key];
       }
     });
-    
-    console.log('🔄 Update data:', {
-      name: req.body.name,
-      variationsCount: req.body.variations?.length || 0,
-      colorImagesCount: req.body.colorImages?.length || 0
-    });
+
     
     // ✅ Use findByIdAndUpdate with $set
     product = await Product.findByIdAndUpdate(
@@ -1217,8 +1195,6 @@ exports.updateVariation = async (req, res, next) => {
   try {
     const { id, variationId } = req.params;
     
-    console.log('Updating variation:', { id, variationId, body: req.body });
-    
     // Find product with current version
     const product = await Product.findById(id);
     
@@ -1274,12 +1250,6 @@ exports.bulkUpdateVariations = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { variations, deletedVariations = [] } = req.body;
-    
-    console.log('Bulk updating variations:', { 
-      productId: id, 
-      variationsCount: variations?.length,
-      deletedCount: deletedVariations?.length
-    });
     
     const product = await Product.findById(id);
     if (!product) {
@@ -1728,12 +1698,6 @@ exports.addImagesToVariation = async (req, res, next) => {
   try {
     const { id, variationId } = req.params;
     
-    console.log('📤 Adding images to variation...');
-    console.log('Product ID:', id);
-    console.log('Variation ID:', variationId);
-    console.log('Request files:', req.files);
-    console.log('Request body:', req.body);
-    
     const product = await Product.findById(id);
     if (!product) {
       return res.status(404).json({
@@ -1765,8 +1729,6 @@ exports.addImagesToVariation = async (req, res, next) => {
       isMain: variation.images.length === 0 && index === 0, // First image as main
       order: variation.images.length + index
     }));
-    
-    console.log('Processed images:', images);
     
     // Add images to variation
     variation.images = [...variation.images, ...images];
@@ -2148,9 +2110,6 @@ exports.getProductDetails = async (req, res, next) => {
 // Upload product images
 exports.uploadProductImages = async (req, res, next) => {
   try {
-    console.log('📤 Uploading product images...');
-    console.log('📁 Request files:', req.files);
-    console.log('📁 Request body:', req.body);
     
     // ✅ CORRECT: When using upload.array(), files come directly in req.files (not req.files.images)
     if (!req.files || req.files.length === 0) {
@@ -2160,15 +2119,7 @@ exports.uploadProductImages = async (req, res, next) => {
       });
     }
     
-    console.log(`✅ Found ${req.files.length} images`);
-    
     const uploadedImages = req.files.map(file => {
-      console.log('📄 File info:', {
-        filename: file.filename,
-        folder: file.folder,
-        fullUrl: file.fullUrl,
-        path: file.path
-      });
       
       return {
         url: file.fullUrl,

@@ -4,7 +4,6 @@ const getFullImageUrl = require('../utils/getFullImageUrl');
 
 exports.uploadCategoryImage = async (req, res, next) => {
   try {
-    console.log('📤 Uploading category image...');
     
     if (!req.file) {
       return res.status(400).json({
@@ -16,9 +15,6 @@ exports.uploadCategoryImage = async (req, res, next) => {
     // ✅ Now req.file will have fullUrl and folder properties
     const imageUrl = req.file.fullUrl;
     const folder = req.file.folder;
-    
-    console.log('✅ Image uploaded to folder:', folder);
-    console.log('✅ Full URL:', imageUrl);
     
     res.status(200).json({
       success: true,
@@ -239,8 +235,6 @@ exports.getSubCategories = async (req, res, next) => {
   try {
     const { categoryId } = req.params;
     
-    console.log('📂 Fetching subcategories for category:', categoryId);
-    
     // Check if category exists
     const category = await Category.findById(categoryId);
     if (!category) {
@@ -257,8 +251,6 @@ exports.getSubCategories = async (req, res, next) => {
     })
     .sort({ name: 1 }) // Sort by name alphabetically
     .select('_id name slug description image status featured level');
-    
-    console.log(`✅ Found ${subCategories.length} subcategories`);
     
     res.status(200).json({
       success: true,
@@ -280,8 +272,6 @@ exports.getSubCategories = async (req, res, next) => {
 exports.getCategoryWithChildren = async (req, res, next) => {
   try {
     const { categoryId } = req.params;
-    
-    console.log('🌳 Fetching category with all children:', categoryId);
     
     // Find the main category
     const category = await Category.findById(categoryId);
@@ -341,7 +331,6 @@ exports.getCategoryWithChildren = async (req, res, next) => {
 // ✅ Get all categories with hierarchy (for product forms)
 exports.getCategoriesHierarchy = async (req, res, next) => {
   try {
-    console.log('📊 Fetching categories hierarchy...');
     
     // Get all main categories (level 0)
     const mainCategories = await Category.find({ 
@@ -384,7 +373,6 @@ exports.getCategoriesHierarchy = async (req, res, next) => {
       })
     );
     
-    console.log(`✅ Found ${mainCategories.length} main categories with hierarchy`);
     
     res.status(200).json({
       success: true,
@@ -406,9 +394,6 @@ exports.createMultipleCategories = async (req, res, next) => {
   try {
     const { categories } = req.body;
     
-    console.log('📥 Received categories for batch:', categories?.length || 0);
-    console.log('📥 Full data structure:', JSON.stringify(categories, null, 2));
-    
     if (!Array.isArray(categories) || categories.length === 0) {
       return res.status(400).json({
         success: false,
@@ -423,15 +408,8 @@ exports.createMultipleCategories = async (req, res, next) => {
       for (const cat of categoriesToProcess) {
         // Skip if no name
         if (!cat.name || cat.name.trim() === '') {
-          console.log('⚠️ Skipping category without name');
           continue;
         }
-        
-        console.log(`\n📝 Processing: "${cat.name}"`);
-        console.log(`   Level: ${level}`);
-        console.log(`   Parent ID: ${parentId || 'null (main category)'}`);
-        console.log(`   Parent Name: ${parentName || 'none'}`);
-        console.log(`   Has subCategories: ${cat.subCategories?.length || 0}`);
         
         // ✅ Prepare category data
         const categoryData = {
@@ -451,26 +429,19 @@ exports.createMultipleCategories = async (req, res, next) => {
         if (cat.imageUrl && typeof cat.imageUrl === 'string' && cat.imageUrl.trim() !== '') {
           if (!cat.imageUrl.startsWith('blob:')) {
             categoryData.image = cat.imageUrl.trim();
-            console.log(`   ✅ Image: ${cat.imageUrl}`);
-          } else {
-            console.log(`   ⚠️ Skipping blob URL`);
           }
         } else {
-          console.log(`   📭 No image`);
+          console.log(`📭 No image`);
         }
         
         try {
           // ✅ Create category
           const createdCategory = await Category.create(categoryData);
-          console.log(`   ✅ Created: ${createdCategory.name} (ID: ${createdCategory._id})`);
-          console.log(`   📍 Parent in DB: ${createdCategory.parent || 'null'}`);
-          console.log(`   📍 Level in DB: ${createdCategory.level}`);
           
           createdCategories.push(createdCategory);
           
           // ✅ CRITICAL FIX: Recursively process sub-categories with correct parent ID
           if (cat.subCategories && Array.isArray(cat.subCategories) && cat.subCategories.length > 0) {
-            console.log(`   📁 Processing ${cat.subCategories.length} child categories...`);
             
             // Pass current category's ID as parentId for its children
             const subCategories = await processCategories(
@@ -481,7 +452,7 @@ exports.createMultipleCategories = async (req, res, next) => {
             );
             createdCategories.push(...subCategories);
           } else {
-            console.log(`   📭 No child categories`);
+            console.log(`📭 No child categories`);
           }
           
         } catch (createError) {
@@ -496,11 +467,7 @@ exports.createMultipleCategories = async (req, res, next) => {
     // ✅ Process all categories starting from root (level 0, no parent)
     const createdCategories = await processCategories(categories, null, 0, '');
     
-    console.log('\n✅ FINAL RESULT:');
-    console.log(`Total categories created: ${createdCategories.length}`);
-    
     // Log hierarchy
-    console.log('\n📊 CATEGORY HIERARCHY:');
     createdCategories.forEach(cat => {
       console.log(`${'  '.repeat(cat.level)}${cat.level === 0 ? '🌳' : '├─'} ${cat.name} (Level: ${cat.level}, Parent: ${cat.parent || 'null'})`);
     });
@@ -569,9 +536,6 @@ exports.updateCategory = async (req, res, next) => {
     const categoryId = req.params.id;
     const updateData = req.body;
     
-    console.log('📝 Updating category:', categoryId);
-    console.log('📦 Update data keys:', Object.keys(updateData));
-    
     let category = await Category.findById(categoryId);
     
     if (!category) {
@@ -613,17 +577,14 @@ exports.updateCategory = async (req, res, next) => {
     });
     
     await category.save();
-    console.log(`✅ Updated main category: ${category.name}`);
     
     // ✅ Process children updates with proper duplicate handling
     if (updateData.children && Array.isArray(updateData.children)) {
-      console.log(`🔄 Processing ${updateData.children.length} children updates...`);
       
       const updateChildren = async (parentId, children, level = 1) => {
         const results = [];
         
         for (const childData of children) {
-          console.log(`   Processing child: ${childData.name} (has _id: ${!!childData._id})`);
           
           let childCategory;
           
@@ -641,7 +602,6 @@ exports.updateCategory = async (req, res, next) => {
                   });
                   
                   if (duplicateChild) {
-                    console.log(`   ⚠️ Skipping child "${childData.name}" - duplicate name`);
                     continue; // Skip this child
                   }
                 }
@@ -660,7 +620,6 @@ exports.updateCategory = async (req, res, next) => {
                 }
                 
                 await childCategory.save();
-                console.log(`   ✅ Updated existing child: ${childCategory.name}`);
               }
             } catch (childError) {
               console.error(`   ❌ Error updating child ${childData.name}:`, childError.message);
@@ -676,7 +635,6 @@ exports.updateCategory = async (req, res, next) => {
               });
               
               if (existingChild) {
-                console.log(`   ⚠️ Child "${childData.name}" already exists under this parent`);
                 
                 // Update existing instead of creating new
                 existingChild.slug = childData.slug || existingChild.slug;
@@ -687,7 +645,6 @@ exports.updateCategory = async (req, res, next) => {
                 
                 await existingChild.save();
                 childCategory = existingChild;
-                console.log(`   ✅ Updated existing duplicate child: ${childCategory.name}`);
               } else {
                 // Create new child
                 childCategory = await Category.create({
@@ -702,13 +659,9 @@ exports.updateCategory = async (req, res, next) => {
                   parent: parentId,
                   level: level
                 });
-                console.log(`   ✅ Created new child: ${childCategory.name}`);
               }
             } catch (createError) {
               if (createError.code === 11000) {
-                console.log(`   ⚠️ Duplicate name "${childData.name}" - skipping`);
-              } else {
-                console.error(`   ❌ Error creating child ${childData.name}:`, createError.message);
               }
               continue; // Skip to next child
             }
@@ -716,7 +669,6 @@ exports.updateCategory = async (req, res, next) => {
           
           // ✅ Recursively process grandchildren if child was successfully processed
           if (childCategory && childData.children && Array.isArray(childData.children)) {
-            console.log(`   📁 Processing grandchildren of ${childCategory.name}`);
             await updateChildren(childCategory._id, childData.children, level + 1);
           }
           
@@ -729,7 +681,6 @@ exports.updateCategory = async (req, res, next) => {
       };
       
       await updateChildren(category._id, updateData.children, 1);
-      console.log('✅ All children processed successfully');
     }
     
     // ✅ Fetch updated category with children for response
@@ -765,8 +716,6 @@ exports.updateCategory = async (req, res, next) => {
 exports.updateAttributeTemplates = async (req, res, next) => {
   try {
     const { attributeTemplates, variationTypes } = req.body;
-    
-    console.log('Received data for update:', { attributeTemplates, variationTypes });
     
     // Format attribute templates - only names
     const formattedAttributeTemplates = attributeTemplates?.map(attr => ({

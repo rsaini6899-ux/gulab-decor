@@ -34,18 +34,6 @@ exports.getCartItems = async (req, res) => {
       try {
         const product = item.productId;
         const variationId = item.variationId;
-        
-        console.log("Processing cart item:", {
-          productId: product._id,
-          productName: product.name,
-          variationId: variationId.toString(),
-          availableVariations: product.variations?.map(v => ({
-            id: v._id.toString(),
-            color: v.color,
-            price: v.price,
-            isMain: v.isMain
-          }))
-        });
 
         let variationDetails = null;
         let mainImage = null;
@@ -56,16 +44,8 @@ exports.getCartItems = async (req, res) => {
             v._id.toString() === variationId.toString()
           );
 
-          console.log("Found variation:", variationDetails ? {
-            id: variationDetails._id,
-            color: variationDetails.color,
-            price: variationDetails.price,
-            isMain: variationDetails.isMain
-          } : "Not found");
-
           // ✅ Get main image for this variation's color (isMain: true)
           if (variationDetails && variationDetails.color && product.colorImages) {
-            console.log("Looking for color group:", variationDetails.color);
             
             const colorGroup = product.colorImages.find(ci => {
               // Handle both string and object cases
@@ -74,16 +54,13 @@ exports.getCartItems = async (req, res) => {
             });
             
             if (colorGroup && colorGroup.images) {
-              console.log("Found color group with images:", colorGroup.images.length);
               
               // Find image with isMain: true
               mainImage = colorGroup.images.find(img => img.isMain === true);
-              console.log("Main image found:", mainImage ? "Yes" : "No");
               
               // If no main image found, use first image
               if (!mainImage && colorGroup.images.length > 0) {
                 mainImage = colorGroup.images[0];
-                console.log("Using first image as fallback");
               }
             } else {
               console.log("No color group found for color:", variationDetails.color);
@@ -93,7 +70,6 @@ exports.getCartItems = async (req, res) => {
 
         // ✅ If variation not found by ID, try to find by matching attributes
         if (!variationDetails && product.variations && product.variations.length > 0) {
-          console.log("Variation not found by ID, trying to find by matching attributes");
           
           // Get the variation from cart item's original data if available
           const originalVariation = item.variationDetails || item.variation;
@@ -121,25 +97,12 @@ exports.getCartItems = async (req, res) => {
               return false;
             });
             
-            console.log("Found variation by attributes:", variationDetails ? {
-              id: variationDetails._id,
-              color: variationDetails.color,
-              price: variationDetails.price
-            } : "Not found");
           }
         }
 
         // ✅ If still not found, use main variation or first variation
         if (!variationDetails && product.variations && product.variations.length > 0) {
-          console.log("Using main variation or first variation as fallback");
           variationDetails = product.variations.find(v => v.isMain === true) || product.variations[0];
-          
-          console.log("Fallback variation:", {
-            id: variationDetails._id,
-            color: variationDetails.color,
-            price: variationDetails.price,
-            isMain: variationDetails.isMain
-          });
           
           // Get image for this variation's color
           if (variationDetails && variationDetails.color && product.colorImages) {
@@ -171,14 +134,6 @@ exports.getCartItems = async (req, res) => {
           mainImage: mainImage, // ✅ This is the correct image for this variation's color
           images: variationDetails.images || []
         } : null;
-
-        console.log("Final variation details:", {
-          id: enhancedVariationDetails?._id,
-          color: enhancedVariationDetails?.color,
-          price: enhancedVariationDetails?.price,
-          hasMainImage: !!enhancedVariationDetails?.mainImage,
-          mainImageUrl: enhancedVariationDetails?.mainImage?.url
-        });
 
         return {
           ...item.toObject(),

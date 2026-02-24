@@ -13,9 +13,7 @@ const generateOTP = () => {
 };
 
 exports.uploadAuthImage = async (req, res, next) => {
-  try {
-    console.log('📤 Uploading auth image...');
-    
+  try {    
     if (!req.file) {
       return res.status(400).json({
         success: false,
@@ -25,9 +23,6 @@ exports.uploadAuthImage = async (req, res, next) => {
     
     const imageUrl = req.file.fullUrl;
     const folder = req.file.folder;
-    
-    console.log('✅ Image uploaded to folder:', folder);
-    console.log('✅ Full URL:', imageUrl);
     
     res.status(200).json({
       success: true,
@@ -148,13 +143,11 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // Google Authentication & Sign In
 exports.googleAuth = async (req, res) => {
   try {
-    console.log('=== GOOGLE AUTH REQUEST ===');
     const { token, code, redirectUri } = req.body;
     
     // ✅ Simple cache to prevent code reuse
     const cacheKey = `google_code_${code}`;
     if (global.googleCodeCache && global.googleCodeCache[cacheKey]) {
-      console.log('Code already used, rejecting');
       return res.status(400).json({
         success: false,
         message: 'This authorization code has already been used',
@@ -181,7 +174,6 @@ exports.googleAuth = async (req, res) => {
     );
 
     if (code) {
-      console.log('Processing OAuth code');
       
       try {
         const { tokens } = await client.getToken({
@@ -189,15 +181,12 @@ exports.googleAuth = async (req, res) => {
           redirect_uri: redirectUri || `${process.env.FRONTEND_URL || 'http://localhost:5174'}/auth/google/callback`
         });
         
-        console.log('Code exchanged successfully');
-        
         const ticket = await client.verifyIdToken({
           idToken: tokens.id_token,
           audience: process.env.GOOGLE_CLIENT_ID
         });
         
         payload = ticket.getPayload();
-        console.log('User email:', payload.email);
         
       } catch (codeError) {
         console.error('Code exchange failed:', codeError.message);
@@ -217,7 +206,6 @@ exports.googleAuth = async (req, res) => {
       }
     } 
     else if (token) {
-      console.log('Processing direct token');
       const ticket = await client.verifyIdToken({
         idToken: token,
         audience: process.env.GOOGLE_CLIENT_ID,
@@ -237,7 +225,6 @@ exports.googleAuth = async (req, res) => {
     let user = await User.findOne({ email });
 
     if (!user) {
-      console.log('Creating new user for:', email);
       user = await User.create({
         name,
         email,
@@ -255,9 +242,7 @@ exports.googleAuth = async (req, res) => {
     }
 
     // Generate JWT token
-    const jwtToken = user.getJwtToken();
-
-    console.log('Login successful for:', email);
+    const jwtToken = user.getJwtToken()
 
     res.status(200).json({
       success: true,
@@ -530,9 +515,6 @@ exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
     const { name, email, phone, address, city, state, pincode, landmark } = req.body;
-
-    console.log('Updating profile for user:', userId);
-    console.log('Update data:', { name, email, phone, address, city, state, pincode, landmark });
 
     const user = await User.findById(userId);
 

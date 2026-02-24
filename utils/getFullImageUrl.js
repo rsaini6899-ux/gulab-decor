@@ -9,8 +9,6 @@ const path = require('path');
 const getFullImageUrl = (req, filePath) => {
   if (!filePath) return null;
   
-  console.log('📁 Original filePath:', filePath);
-  
   // ✅ Check if it's already a full URL
   if (filePath.startsWith('http')) {
     return filePath;
@@ -22,7 +20,6 @@ const getFullImageUrl = (req, filePath) => {
     const uploadsIndex = filePath.indexOf('uploads');
     if (uploadsIndex !== -1) {
       const relativePath = filePath.substring(uploadsIndex);
-      console.log('📁 Extracted relative path:', relativePath);
       return `${req.protocol}://${req.get('host')}/${relativePath.replace(/\\/g, '/')}`;
     }
   }
@@ -30,7 +27,6 @@ const getFullImageUrl = (req, filePath) => {
   // ✅ If it's already a relative path starting with uploads
   if (filePath.startsWith('uploads/') || filePath.startsWith('/uploads/')) {
     const cleanPath = filePath.replace(/\\/g, '/').replace(/^\/+/, '');
-    console.log('📁 Clean relative path:', cleanPath);
     return `${req.protocol}://${req.get('host')}/${cleanPath}`;
   }
   

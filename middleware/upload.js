@@ -41,7 +41,6 @@ const processImage = (defaultFolder = 'general') => async (req, res, next) => {
     let folder = req.body.folder || defaultFolder;
     folder = folder.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
     
-    console.log(`📂 Processing for folder: ${folder}`);
     ensureSubFolder(folder);
 
     const processFile = async (file) => {
@@ -86,9 +85,6 @@ const processImage = (defaultFolder = 'general') => async (req, res, next) => {
         file.folder = folder;
         file.fullUrl = `${req.protocol}://${req.get('host')}/${file.path}`;
       }
-      
-      console.log(`📄 File saved to: ${file.path}`);
-      console.log(`🌐 Access URL: ${file.fullUrl}`);
     };
 
     // Process files

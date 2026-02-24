@@ -9,12 +9,6 @@ const authMiddleware = async (req, res, next) => {
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
     }
-    console.log('token:', token);
-
-    console.log(new Date());
-
-    console.log("Current Time:", Math.floor(Date.now() / 1000));
-    
     if (!token) {
       return res.status(401).json({
         success: false,
@@ -24,9 +18,6 @@ const authMiddleware = async (req, res, next) => {
     
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-
-    console.log('Decoded token:', decoded);
     
     // Check if user exists
     const user = await User.findById(decoded.id);
