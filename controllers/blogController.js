@@ -2,6 +2,62 @@ const Blog = require('../models/blog');
 const getFullImageUrl = require('../utils/getFullImageUrl'); 
 
 // Create new blog
+// exports.createBlog = async (req, res, next) => {
+//   try {
+
+//     // Validate required fields
+//     const { title, category } = req.body;
+//     if (!title || !category) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Title and category are required'
+//       });
+//     }
+
+//     // Handle image upload
+//     let imageData = {};
+//     if (req.files && req.files.image) {
+//       const imageFile = req.files.image[0];
+//       imageData = {
+//         url: imageFile.fullUrl,
+//         public_id: imageFile.filename,
+//         folder: imageFile.folder
+//       };
+//     } else if (req.body.image) {
+//       // If image URL provided directly
+//       if (typeof req.body.image === 'string') {
+//         imageData = {
+//           url: req.body.image,
+//           public_id: `external-${Date.now()}`,
+//           folder: 'external'
+//         };
+//       } else if (typeof req.body.image === 'object') {
+//         imageData = req.body.image;
+//       }
+//     }
+
+//     // Prepare blog data
+//     const blogData = {
+//       title,
+//       category,
+//       image: imageData,
+//       status: req.body.status || 'draft',
+//       metaTitle: req.body.metaTitle,
+//     };
+
+//     // Create blog
+//     const blog = await Blog.create(blogData);
+
+//     res.status(201).json({
+//       success: true,
+//       message: 'Blog created successfully',
+//       data: blog
+//     });
+//   } catch (error) {
+//     console.error('❌ Error creating blog:', error);
+//     next(error);
+//   }
+// };
 exports.createBlog = async (req, res, next) => {
   try {
 
@@ -16,13 +72,20 @@ exports.createBlog = async (req, res, next) => {
 
     // Handle image upload
     let imageData = {};
-    if (req.files && req.files.image) {
-      const imageFile = req.files.image[0];
+    if (req.files && req.files.image) {      const imageFile = req.files.image[0];
+      
+      // ✅ URL generate karo sahi tarike se
+      const filePath = imageFile.path || imageFile.filename || `uploads/blogs/${imageFile.filename}`;
+      const imageUrl = getFullImageUrl(req, filePath);
+      
       imageData = {
-        url: imageFile.fullUrl,
+        url: imageUrl,  // ✅ GENERATED URL
         public_id: imageFile.filename,
-        folder: imageFile.folder
+        folder: imageFile.folder || 'blogs'
       };
+      
+      console.log('Blog Create - Generated Image URL:', imageUrl); // Debug
+      
     } else if (req.body.image) {
       // If image URL provided directly
       if (typeof req.body.image === 'string') {
@@ -43,6 +106,7 @@ exports.createBlog = async (req, res, next) => {
       image: imageData,
       status: req.body.status || 'draft',
       metaTitle: req.body.metaTitle,
+      // ... other fields
     };
 
     // Create blog
@@ -181,6 +245,50 @@ exports.getBlogById = async (req, res, next) => {
 };
 
 // Update blog
+// exports.updateBlog = async (req, res, next) => {
+//   try {
+//     let blog = await Blog.findById(req.params.id);
+
+//     if (!blog) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Blog not found'
+//       });
+//     }
+
+//     // Handle image update
+//     if (req.files && req.files.image) {
+//       const imageFile = req.files.image[0];
+//       req.body.image = {
+//         url: imageFile.fullUrl,
+//         public_id: imageFile.filename,
+//         folder: imageFile.folder
+//       };
+//     }
+
+//     // Prepare update data
+//     const updateData = { ...req.body };
+
+//     // Update blog
+//     blog = await Blog.findByIdAndUpdate(
+//       req.params.id,
+//       updateData,
+//       {
+//         new: true,
+//         runValidators: true
+//       }
+//     )
+
+//     res.status(200).json({
+//       success: true,
+//       message: 'Blog updated successfully',
+//       data: blog
+//     });
+//   } catch (error) {
+//     console.error('❌ Error updating blog:', error);
+//     next(error);
+//   }
+// };
 exports.updateBlog = async (req, res, next) => {
   try {
     let blog = await Blog.findById(req.params.id);
@@ -195,11 +303,18 @@ exports.updateBlog = async (req, res, next) => {
     // Handle image update
     if (req.files && req.files.image) {
       const imageFile = req.files.image[0];
+      
+      // ✅ URL generate karo sahi tarike se
+      const filePath = imageFile.path || imageFile.filename || `uploads/blogs/${imageFile.filename}`;
+      const imageUrl = getFullImageUrl(req, filePath);
+      
       req.body.image = {
-        url: imageFile.fullUrl,
+        url: imageUrl,  // ✅ GENERATED URL
         public_id: imageFile.filename,
-        folder: imageFile.folder
+        folder: imageFile.folder || 'blogs'
       };
+      
+      console.log('Blog Update - Generated Image URL:', imageUrl); // Debug
     }
 
     // Prepare update data
@@ -213,7 +328,7 @@ exports.updateBlog = async (req, res, next) => {
         new: true,
         runValidators: true
       }
-    )
+    );
 
     res.status(200).json({
       success: true,
@@ -225,6 +340,7 @@ exports.updateBlog = async (req, res, next) => {
     next(error);
   }
 };
+
 
 // Delete blog
 exports.deleteBlog = async (req, res, next) => {
