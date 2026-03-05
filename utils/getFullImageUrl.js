@@ -38,6 +38,7 @@
 // module.exports = getFullImageUrl;
 
 const getFullImageUrl = (req, filePath) => {
+  
   if (!filePath) return null;
   
   // ✅ Check if it's already a full URL
@@ -49,9 +50,9 @@ const getFullImageUrl = (req, filePath) => {
     return filePath;
   }
   
-  // ✅ Production me always HTTPS use karein
+  // ✅ Production me DIRECTLY https use karo - headers ko ignore karo
   const host = req.get('host');
-  const protocol = process.env.NODE_ENV === 'production' ? 'https' : req.protocol;
+  const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
   
   // ✅ If it's an absolute Windows path like "E:\vidhalay\..."
   if (filePath.includes(':\\') || filePath.includes('E:/')) {
@@ -72,3 +73,5 @@ const getFullImageUrl = (req, filePath) => {
   const formattedPath = filePath.replace(/\\/g, '/').replace(/^\/+/, '');
   return `${protocol}://${host}/${formattedPath}`;
 };
+
+module.exports = getFullImageUrl;

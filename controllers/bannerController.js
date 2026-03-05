@@ -1,4 +1,5 @@
 const Banner = require('../models/banner');
+const getFullImageUrl = require('../utils/getFullImageUrl');
 
 // Get all banners
 exports.getAllBanners = async (req, res, next) => {
@@ -299,9 +300,38 @@ exports.deleteBanner = async (req, res, next) => {
 };
 
 // Upload banner image
+// exports.uploadBannerImage = async (req, res, next) => {
+//   try {
+
+//     if (!req.files || !req.files.image) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Please upload an image file'
+//       });   
+//     }
+
+//     const imageFile = req.files.image[0];
+
+//     res.status(200).json({
+//       success: true,
+//       message: 'Image uploaded successfully',
+//       data: {
+//         image: {
+//           url: imageFile.fullUrl,
+//           public_id: imageFile.filename,
+//           folder: imageFile.folder,
+//           size: imageFile.size,
+//           mimetype: imageFile.mimetype
+//         }
+//       }
+//     });
+//   } catch (error) {
+//     console.error('❌ Error uploading image:', error);
+//     next(error);
+//   }
+// };
 exports.uploadBannerImage = async (req, res, next) => {
   try {
-
     if (!req.files || !req.files.image) {
       return res.status(400).json({
         success: false,
@@ -310,13 +340,18 @@ exports.uploadBannerImage = async (req, res, next) => {
     }
 
     const imageFile = req.files.image[0];
+    
+    // ✅ URL abhi generate karo with proper request object
+    const imageUrl = getFullImageUrl(req, imageFile.path || imageFile.filename);
+    
+    console.log('Generated URL:', imageUrl); // Debug ke liye
 
     res.status(200).json({
       success: true,
       message: 'Image uploaded successfully',
       data: {
         image: {
-          url: imageFile.fullUrl,
+          url: imageUrl,  // ✅ YAHAN GENERATED URL USE KARO
           public_id: imageFile.filename,
           folder: imageFile.folder,
           size: imageFile.size,

@@ -2,6 +2,42 @@ const Category = require('../models/Category');
 
 const getFullImageUrl = require('../utils/getFullImageUrl');
 
+// exports.uploadCategoryImage = async (req, res, next) => {
+//   try {
+    
+//     if (!req.file) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'No image file provided'
+//       });
+//     }
+    
+//     // ✅ Now req.file will have fullUrl and folder properties
+//     const imageUrl = req.file.fullUrl;
+//     const folder = req.file.folder;
+    
+//     res.status(200).json({
+//       success: true,
+//       message: 'Image uploaded successfully',
+//       data: {
+//         url: imageUrl,
+//         path: req.file.path,
+//         folder: folder,
+//         filename: req.file.filename,
+//         size: req.file.size,
+//         mimetype: req.file.mimetype
+//       }
+//     });
+    
+//   } catch (error) {
+//     console.error('❌ Error uploading image:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: error.message || 'Failed to upload image'
+//     });
+//   }
+// };
+
 exports.uploadCategoryImage = async (req, res, next) => {
   try {
     
@@ -12,17 +48,23 @@ exports.uploadCategoryImage = async (req, res, next) => {
       });
     }
     
-    // ✅ Now req.file will have fullUrl and folder properties
-    const imageUrl = req.file.fullUrl;
-    const folder = req.file.folder;
+    // ❌ YEH GALAT HAI - req.file.fullUrl par rely mat karo
+    // const imageUrl = req.file.fullUrl;
+    
+    // ✅ YEH SAHI HAI - URL abhi generate karo
+    const filePath = req.file.path || req.file.filename || `uploads/categories/${req.file.filename}`;
+    const imageUrl = getFullImageUrl(req, filePath);
+    
+    // Debug (optional)
+    console.log('Category Image Upload - Generated URL:', imageUrl);
     
     res.status(200).json({
       success: true,
       message: 'Image uploaded successfully',
       data: {
-        url: imageUrl,
+        url: imageUrl,  // ✅ GENERATED URL
         path: req.file.path,
-        folder: folder,
+        folder: req.file.folder || 'categories',
         filename: req.file.filename,
         size: req.file.size,
         mimetype: req.file.mimetype
@@ -37,6 +79,7 @@ exports.uploadCategoryImage = async (req, res, next) => {
     });
   }
 };
+
 
 exports.getAllCategories = async (req, res, next) => {
   try {

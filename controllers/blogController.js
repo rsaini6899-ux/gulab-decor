@@ -1,4 +1,5 @@
 const Blog = require('../models/blog');
+const getFullImageUrl = require('../utils/getFullImageUrl'); 
 
 // Create new blog
 exports.createBlog = async (req, res, next) => {
@@ -255,6 +256,35 @@ exports.deleteBlog = async (req, res, next) => {
 };
 
 // Upload blog image
+// exports.uploadBlogImage = async (req, res, next) => {
+//   try {
+//     if (!req.files || !req.files.image) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Please upload an image file'
+//       });   
+//     }
+
+//     const imageFile = req.files.image[0];
+
+//     res.status(200).json({
+//       success: true,
+//       message: 'Image uploaded successfully',
+//       data: {
+//         image: {
+//           url: imageFile.fullUrl,
+//           public_id: imageFile.filename,
+//           folder: imageFile.folder,
+//           size: imageFile.size,
+//           mimetype: imageFile.mimetype
+//         }
+//       }
+//     });
+//   } catch (error) {
+//     console.error('❌ Error uploading image:', error);
+//     next(error);
+//   }
+// };
 exports.uploadBlogImage = async (req, res, next) => {
   try {
     if (!req.files || !req.files.image) {
@@ -265,22 +295,29 @@ exports.uploadBlogImage = async (req, res, next) => {
     }
 
     const imageFile = req.files.image[0];
+    
+    // ✅ URL generate karo proper tarike se
+    const filePath = imageFile.path || imageFile.filename || `uploads/blogs/${imageFile.filename}`;
+    const imageUrl = getFullImageUrl(req, filePath);
+    
+    // Debug (optional - production mein hata sakte ho)
+    console.log('Blog Image Upload - Generated URL:', imageUrl);
 
     res.status(200).json({
       success: true,
       message: 'Image uploaded successfully',
       data: {
         image: {
-          url: imageFile.fullUrl,
+          url: imageUrl,  // ✅ YEH USE KARO, imageFile.fullUrl nahi
           public_id: imageFile.filename,
-          folder: imageFile.folder,
+          folder: imageFile.folder || 'blogs',
           size: imageFile.size,
           mimetype: imageFile.mimetype
         }
       }
     });
   } catch (error) {
-    console.error('❌ Error uploading image:', error);
+    console.error('❌ Error uploading blog image:', error);
     next(error);
   }
 };
