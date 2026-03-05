@@ -1445,3 +1445,18 @@ exports.processRefund = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.getCustomerOrders = async (req, res, next) => {
+  try {
+    const orders = await Order.find({ customer: req.params.customerId })
+      .sort({ createdAt: -1 })
+      .populate('items.product', 'name images price');
+    
+    res.status(200).json({
+      success: true,
+      orders
+    });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Order = require('../models/Order');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const getFullImageUrl = require('../utils/getFullImageUrl');
@@ -614,14 +615,90 @@ exports.getAllUsers = async (req, res, next) => {
   }
 };
 
+exports.getUserDetails = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    const orders = await Order.find({ customer: user._id }).sort({ createdAt: -1 });
+    
+    res.status(200).json({
+      success: true,
+      user,
+      orders
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// exports.updateUser = async (req, res, next) => {
+//   try {
+//     const { name, email, phone, isActive, role } = req.body;
+//     const user = await User.findByIdAndUpdate(
+//       req.params.id,
+//       { name, email, phone, isActive, role },
+//       { new: true, runValidators: true }
+//     );
+//     res.status(200).json({
+//       success: true,
+//       message: 'User updated successfully',
+//       user
+//     });
+//   } catch (error) {
+//     next(error);
+//   }
+// };
+
+// Get single user by ID
+exports.getUserById = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      user
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update user
 exports.updateUser = async (req, res, next) => {
   try {
-    const { name, email, phone, isActive, role } = req.body;
+    const updates = req.body;
+    
+    // Remove fields that shouldn't be updated directly
+    delete updates.password;
+    delete updates._id;
+    delete updates.createdAt;
+    
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      { name, email, phone, isActive, role },
+      updates,
       { new: true, runValidators: true }
-    );
+    ).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
     res.status(200).json({
       success: true,
       message: 'User updated successfully',
@@ -631,3 +708,23 @@ exports.updateUser = async (req, res, next) => {
     next(error);
   }
 };
+
+// Delete user
+exports.deleteUser = async (req, res, next) => {
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }};
