@@ -77,6 +77,13 @@ router.get('/details/:id', productController.getProductDetails);
 
 
 router.get('/categories/slug/:categorySlug/subcategories', productController.getSubCategoriesByCategorySlug);
+router.get('/categories/id/:categoryId/subcategories', productController.getSubCategoriesByCategoryId);
+router.get('/categories/slug/:slug', productController.getCategoryBySlug);
 router.get('/categories/slug/:categorySlug/products', productController.getProductsByCategorySlug);
 router.get('/categories/:categorySlug/:subCategorySlug/products', productController.getProductsBySubCategorySlug);
+
+// एक ही API - कितने भी लेवल के लिए काम करेगा
+router.get('/categories/*/products', productController.getProductsByCategoryPath);
+
+
 module.exports = router;

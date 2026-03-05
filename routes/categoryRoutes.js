@@ -26,6 +26,9 @@ router.get('/nested', categoryController.getCategories);
 router.get('/:id', categoryController.getCategoryById);
 // Get subcategories of a specific category
 router.get('/:categoryId/subcategories', categoryController.getSubCategories);
+router.get('/:parentId/children', categoryController.getChildCategories);
+router.get('/slug/:slug', categoryController.getCategoryBySlug);
+router.get('/level/:level', categoryController.getCategoriesByLevel);
 
 // Get category with all children (nested)
 router.get('/:categoryId/with-children', categoryController.getCategoryWithChildren);

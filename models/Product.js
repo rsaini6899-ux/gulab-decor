@@ -35,6 +35,11 @@ const productSchema = new mongoose.Schema({
     default: null
   },
 
+    categoryPath: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category'
+  }],
+
   cost: Number,
   
   // Dynamic Attributes
@@ -122,7 +127,6 @@ const productSchema = new mongoose.Schema({
   // Inventory
   stock: {
     type: Number,
-    default: 0
   },
   sold: {
     type: Number,
@@ -184,31 +188,6 @@ const productSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// ✅ ADD virtual field to get variations with images
-// productSchema.virtual('variationsWithImages').get(function() {
-//   if (!this.variations) return [];
-  
-//   return this.variations.map(variation => {
-//     const variationObj = variation.toObject ? variation.toObject() : { ...variation };
-    
-//     // Find images for this variation's color
-//     if (this.colorImages && variation.color) {
-//       const colorImageGroup = this.colorImages.find(ci => 
-//         ci.color === variation.color
-//       );
-      
-//       if (colorImageGroup && colorImageGroup.images) {
-//         variationObj.images = colorImageGroup.images;
-//       } else {
-//         variationObj.images = [];
-//       }
-//     } else {
-//       variationObj.images = [];
-//     }
-    
-//     return variationObj;
-//   });
-// });
 productSchema.virtual('variationsWithImages').get(function() {
   if (!this.variations) return [];
   

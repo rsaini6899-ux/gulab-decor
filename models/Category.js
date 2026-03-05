@@ -5,15 +5,12 @@ const categorySchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please enter category name'],
     trim: true,
-    unique: true,
     maxlength: [100, 'Category name cannot exceed 100 characters']
   },
   slug: {
     type: String,
-    unique: true,
     lowercase: true,
-    index: true,
-    sparse: true 
+    index: true
   },
   description: {
     type: String,
@@ -48,33 +45,16 @@ const categorySchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-
-  // ✅ Attribute Templates - Only names
+  
   attributeTemplates: [{
-    name: {
-      type: String,
-      required: true
-    },
-    order: {
-      type: Number,
-      default: 0
-    }
+    name: { type: String, required: true },
+    order: { type: Number, default: 0 }
   }],
   
-  // ✅ Variation Types - With values that will be collected from product variations
   variationTypes: [{
-    name: {
-      type: String,
-      required: true
-    },
-    values: [{
-      type: String,
-      trim: true
-    }],
-    createdAt: {
-      type: Date,
-      default: Date.now
-    }
+    name: { type: String, required: true },
+    values: [{ type: String, trim: true }],
+    createdAt: { type: Date, default: Date.now }
   }],
   
 }, {
@@ -83,18 +63,38 @@ const categorySchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Create slug before saving
-categorySchema.pre('save', function(next) {
+// ✅ IMPORTANT: Compound index for name + parent (यही सही unique constraint है)
+categorySchema.index({ name: 1, parent: 1 }, { unique: true });
+
+// Slug बनाते समय भी uniqueness के लिए parent को ध्यान में रखें
+categorySchema.pre('save', async function(next) {
   if (this.isModified('name')) {
-    this.slug = this.name.toLowerCase()
+    let baseSlug = this.name.toLowerCase()
       .replace(/[^a-zA-Z0-9]/g, '-')
-      .replace(/-+/g, '-');
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    
+    let slug = baseSlug;
+    let counter = 1;
+    
+    // Check if slug exists under same parent
+    const Category = this.constructor;
+    while (await Category.findOne({ 
+      slug: slug, 
+      parent: this.parent,
+      _id: { $ne: this._id }
+    })) {
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+    
+    this.slug = slug;
   }
   
   next();
 });
 
-// Virtual for children categories
+// Virtual for children
 categorySchema.virtual('children', {
   ref: 'Category',
   localField: '_id',

@@ -30,167 +30,364 @@ const validateVariations = (variations) => {
 };
 
 //  Get all products with filters
+// exports.getAllProducts = async (req, res, next) => {
+//   try {
+//     const { status, limit = 100 } = req.query;
+    
+//     const query = {};
+//     if (status) {
+//       query.status = status;
+//     }
+    
+//     const products = await Product.find(query)
+//       .populate('category', 'name slug')
+//       .populate('subCategory', 'name slug')
+//       .sort('-createdAt')
+//       .limit(parseInt(limit));
+
+//     // Process products with same logic as category products
+//     const processedProducts = await Promise.all(products.map(async (product) => {
+//       const productObj = product.toObject();
+      
+//       // Get variations with images
+//       let variationsWithImages = [];
+      
+//       // Try to use virtual field first
+//       if (product.variationsWithImages && product.variationsWithImages.length > 0) {
+//         variationsWithImages = product.variationsWithImages;
+//       } else if (productObj.variations && productObj.colorImages) {
+//         // Manual merge
+//         variationsWithImages = productObj.variations.map(variation => {
+//           const variationObj = { ...variation };
+          
+//           // Find color in variation attributes
+//           const colorAttr = variationObj.attributes?.find(
+//             a => a.name?.toLowerCase() === 'color'
+//           );
+          
+//           if (colorAttr && colorAttr.value && productObj.colorImages) {
+//             // Find matching color in colorImages
+//             const colorGroup = productObj.colorImages.find(
+//               c => c.color === colorAttr.value
+//             );
+            
+//             if (colorGroup && colorGroup.images) {
+//               variationObj.images = colorGroup.images;
+//             }
+//           }
+          
+//           return variationObj;
+//         });
+//       } else {
+//         // Fallback to variations as is
+//         variationsWithImages = productObj.variations || [];
+//       }
+      
+//       // Find main variation
+//       const mainVariation = variationsWithImages.find(v => v.isMain === true) || variationsWithImages[0];
+      
+//       // ✅ Extract colors with their variation IDs and IMAGES (same as category products)
+//       const colorMap = new Map();
+      
+//       variationsWithImages.forEach(variation => {
+//         const colorAttr = variation.attributes?.find(
+//           a => a.name && a.name.toLowerCase() === 'color'
+//         );
+        
+//         if (colorAttr && colorAttr.value) {
+//           const color = colorAttr.value;
+          
+//           if (!colorMap.has(color)) {
+//             colorMap.set(color, {
+//               name: color,
+//               variationIds: [],
+//               count: 0,
+//               images: variation.images || [] // Store images for this color
+//             });
+//           }
+          
+//           const colorInfo = colorMap.get(color);
+//           colorInfo.variationIds.push(variation._id);
+//           colorInfo.count++;
+//         }
+//       });
+      
+//       // Convert to array
+//       const colorsDetailed = Array.from(colorMap.values());
+      
+//       // Price range
+//       const prices = variationsWithImages.map(v => v.price || 0);
+//       const minPrice = Math.min(...prices);
+//       const maxPrice = Math.max(...prices);
+      
+//       return {
+//         // Basic product info
+//         _id: productObj._id,
+//         name: productObj.name,
+//         slug: productObj.slug,
+//         sku: productObj.sku,
+//         description: productObj.description,
+//         shortDescription: productObj.shortDescription,
+//         category: productObj.category,
+//         subCategory: productObj.subCategory,
+//         status: productObj.status,
+//         featured: productObj.featured,
+//         bestseller: productObj.bestseller,
+//         attributes: productObj.attributes,
+//         categoryPath: productObj.categoryPath,
+//         createdAt: productObj.createdAt,
+        
+//         // Main variation with images
+//         mainVariation: mainVariation ? {
+//           _id: mainVariation._id,
+//           sku: mainVariation.sku,
+//           price: mainVariation.price,
+//           comparePrice: mainVariation.comparePrice,
+//           stock: mainVariation.stock,
+//           status: mainVariation.status,
+//           isMain: mainVariation.isMain,
+//           images: mainVariation.images || [],
+//           attributes: mainVariation.attributes || []
+//         } : null,
+        
+//         // ✅ Color information (THIS WAS MISSING!)
+//         allColors: colorsDetailed.map(c => c.name),
+//         colorsDetailed: colorsDetailed,
+        
+//         // Price range
+//         priceRange: { min: minPrice, max: maxPrice },
+        
+//         // Total stock
+//         totalStock: variationsWithImages.reduce((sum, v) => sum + (v.stock || 0), 0),
+        
+//         // All variations
+//         variations: variationsWithImages,
+        
+//         // Debug info
+//         _debug: {
+//           variationsCount: variationsWithImages.length,
+//           colorImagesCount: productObj.colorImages?.length || 0,
+//           colorsDetailedCount: colorsDetailed.length
+//         }
+//       };
+//     }));
+
+//     res.status(200).json({
+//       success: true,
+//       data: processedProducts,
+//       count: processedProducts.length
+//     });
+    
+//   } catch (error) {
+//     console.error('Error in getAllProducts:', error);
+//     next(error);
+//   }
+// };
 exports.getAllProducts = async (req, res, next) => {
   try {
-    // Build query
-    let query = {};
+    const { status, limit = 100 } = req.query;
     
-    // Category filter
-    if (req.query.category) {
-      query.category = req.query.category;
+    const query = {};
+    if (status) {
+      query.status = status;
     }
     
-    // Status filter
-    if (req.query.status && req.query.status !== 'all') {
-      query.status = req.query.status;
-    }
-    
-    // Featured filter
-    if (req.query.featured === 'true') {
-      query.featured = true;
-    }
-
-    // Bestseller filter
-    if (req.query.bestseller === 'true') {
-      query.bestseller = true;
-    }
-    
-    // Stock filter
-    if (req.query.inStock === 'true') {
-      query.stock = { $gt: 0 };
-    } else if (req.query.inStock === 'false') {
-      query.stock = { $lte: 0 };
-    }
-    
-    // Price range
-    if (req.query.minPrice || req.query.maxPrice) {
-      query.price = {};
-      if (req.query.minPrice) query.price.$gte = Number(req.query.minPrice);
-      if (req.query.maxPrice) query.price.$lte = Number(req.query.maxPrice);
-    }
-    
-    // Search
-    if (req.query.search) {
-      query.$or = [
-        { name: { $regex: req.query.search, $options: 'i' } },
-        { sku: { $regex: req.query.search, $options: 'i' } },
-        { description: { $regex: req.query.search, $options: 'i' } }
-      ];
-    }
-    
-    // Pagination
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-    
-    // Sorting
-    let sort = { createdAt: -1 };
-    if (req.query.sort) {
-      const sortField = req.query.sort.replace('-', '');
-      const sortOrder = req.query.sort.startsWith('-') ? -1 : 1;
-      sort = { [sortField]: sortOrder };
-    }
-    
-    // Execute query
     const products = await Product.find(query)
       .populate('category', 'name slug')
       .populate('subCategory', 'name slug')
-      .sort(sort)
-      .skip(skip)
-      .limit(limit)
-      .lean(); // Convert to plain objects
-    
-    // ✅ Process each product to add computed fields WITH VIRTUAL FIELD
-    const processedProducts = products.map(product => {
-      // Get variations with images using virtual field logic
+      .sort('-createdAt')
+      .limit(parseInt(limit));
+
+    const processedProducts = await Promise.all(products.map(async (product) => {
+      const productObj = product.toObject();
+      
       let variationsWithImages = [];
       
-      if (product.variations && product.colorImages) {
-        variationsWithImages = product.variations.map(variation => {
-          const variationObj = { ...variation };
-          
-          // Find images for this variation's color
-          if (product.colorImages && variation.color) {
-            const colorImageGroup = product.colorImages.find(ci => 
-              ci.color === variation.color
+      // पहले variationsWithImages से try करें
+      if (product.variationsWithImages && product.variationsWithImages.length > 0) {
+        variationsWithImages = product.variationsWithImages;
+      } else {
+        variationsWithImages = productObj.variations || [];
+        
+        // अगर colorImages है तो उनसे images assign करें
+        if (productObj.colorImages && productObj.colorImages.length > 0) {
+          variationsWithImages = variationsWithImages.map(variation => {
+            const variationObj = { ...variation };
+            const colorAttr = variationObj.attributes?.find(
+              a => a.name?.toLowerCase() === 'color'
             );
             
-            if (colorImageGroup && colorImageGroup.images) {
-              variationObj.images = colorImageGroup.images;
-            } else {
-              variationObj.images = [];
+            if (colorAttr && colorAttr.value) {
+              const colorGroup = productObj.colorImages.find(
+                c => c.color === colorAttr.value
+              );
+              
+              if (colorGroup && colorGroup.images) {
+                variationObj.images = colorGroup.images;
+              }
             }
-          } else {
-            variationObj.images = [];
-          }
-          
-          return variationObj;
-        });
-      } else {
-        variationsWithImages = product.variations || [];
-      }
-      
-      // Find main variation (isMain = true)
-      const mainVariation = variationsWithImages.find(v => v.isMain === true) || variationsWithImages[0];
-      
-      // Find main image from main variation
-      let displayImage = null;
-      
-      if (mainVariation && mainVariation.images) {
-        // First try to find isMain image
-        displayImage = mainVariation.images.find(img => img.isMain === true);
-        
-        // If no main image found, take first image
-        if (!displayImage && mainVariation.images.length > 0) {
-          displayImage = mainVariation.images[0];
+            return variationObj;
+          });
         }
       }
       
-      // Calculate min and max price
-      const prices = variationsWithImages.map(v => v.price).filter(price => price != null);
+      // ✅ IMPORTANT: Main variation ढूंढें और उसकी images सेट करें
+      const mainVariation = variationsWithImages.find(v => v.isMain === true) || variationsWithImages[0];
+      
+      // ✅ अगर mainVariation में images नहीं है, तो colorImages से ढूंढें
+      if (mainVariation && (!mainVariation.images || mainVariation.images.length === 0)) {
+        const colorAttr = mainVariation?.attributes?.find(
+          a => a.name?.toLowerCase() === 'color'
+        );
+        
+        if (colorAttr && colorAttr.value && productObj.colorImages) {
+          const colorGroup = productObj.colorImages.find(
+            c => c.color === colorAttr.value
+          );
+          
+          if (colorGroup && colorGroup.images) {
+            mainVariation.images = colorGroup.images;
+          }
+        }
+      }
+      
+      // ✅ Display image सेट करें (mainVariation की पहली image)
+      const displayImage = mainVariation?.images && mainVariation.images.length > 0 
+        ? mainVariation.images.find(img => img.isMain) || mainVariation.images[0]
+        : null;
+      
+      // Colors detailed बनाएं
+      const colorMap = new Map();
+      
+      variationsWithImages.forEach(variation => {
+        const colorAttr = variation.attributes?.find(
+          a => a.name && a.name.toLowerCase() === 'color'
+        );
+        
+        if (colorAttr && colorAttr.value) {
+          const color = colorAttr.value;
+          
+          if (!colorMap.has(color)) {
+            // ✅ Color के लिए images ढूंढें
+            let colorImages = variation.images || [];
+            
+            // अगर variation में images नहीं है, तो colorImages से ढूंढें
+            if (colorImages.length === 0 && productObj.colorImages) {
+              const colorGroup = productObj.colorImages.find(
+                c => c.color === color
+              );
+              if (colorGroup && colorGroup.images) {
+                colorImages = colorGroup.images;
+              }
+            }
+            
+            colorMap.set(color, {
+              name: color,
+              variationIds: [],
+              count: 0,
+              images: colorImages
+            });
+          }
+          
+          const colorInfo = colorMap.get(color);
+          colorInfo.variationIds.push(variation._id);
+          colorInfo.count++;
+        }
+      });
+      
+      const colorsDetailed = Array.from(colorMap.values());
+      
+      // ✅ Price range (₹ साइन के साथ)
+      const prices = variationsWithImages
+        .map(v => v.price || 0)
+        .filter(price => price > 0); // 0 price वालों को हटाएं
+        
       const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
       const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
       
-      // Calculate total stock
-      const totalStock = variationsWithImages.reduce((sum, v) => sum + (v.stock || 0), 0);
-      
-      // Get main color from main variation
-      const mainColorAttr = mainVariation?.attributes?.find(attr => 
-        attr.name.toLowerCase() === 'color'
+      // ✅ Main color name ढूंढें
+      const mainColorAttr = mainVariation?.attributes?.find(
+        a => a.name?.toLowerCase() === 'color'
       );
-      const mainColor = mainColorAttr?.value || '';
-      const mainColorName = mainColor ? getColorName(mainColor) : '';
+      
+      const mainColorName = mainColorAttr?.display_name || 
+                           mainColorAttr?.value || 
+                           (colorsDetailed.length > 0 ? colorsDetailed[0].name : null);
+      
+      const mainColor = mainColorAttr?.value || 
+                       (colorsDetailed.length > 0 ? colorsDetailed[0].name : null);
       
       return {
-        ...product,
-        minPrice,
-        maxPrice,
-        totalStock,
-        displayImage: displayImage || null,
+        _id: productObj._id,
+        name: productObj.name,
+        slug: productObj.slug,
+        sku: productObj.sku,
+        description: productObj.description,
+        shortDescription: productObj.shortDescription,
+        category: productObj.category,
+        subCategory: productObj.subCategory,
+        status: productObj.status,
+        featured: productObj.featured,
+        bestseller: productObj.bestseller,
+        attributes: productObj.attributes,
+        categoryPath: productObj.categoryPath,
+        createdAt: productObj.createdAt,
+        
+        // ✅ Display image (फ्रंटएंड के लिए)
+        displayImage: displayImage,
+        
+        // ✅ Main variation with proper images
+        mainVariation: mainVariation ? {
+          _id: mainVariation._id,
+          sku: mainVariation.sku,
+          price: mainVariation.price,
+          comparePrice: mainVariation.comparePrice,
+          stock: mainVariation.stock,
+          status: mainVariation.status,
+          isMain: mainVariation.isMain,
+          images: mainVariation.images || [],
+          attributes: mainVariation.attributes || []
+        } : null,
+        
+        // ✅ Main color info
         mainColor: mainColor,
         mainColorName: mainColorName,
-        mainVariation: mainVariation || null,
-        hasVariations: (variationsWithImages.length > 0)
+        
+        // ✅ All colors
+        allColors: colorsDetailed.map(c => c.name),
+        colorsDetailed: colorsDetailed,
+        
+        // ✅ Price range with min/max
+        minPrice: minPrice,
+        maxPrice: maxPrice,
+        priceRange: { min: minPrice, max: maxPrice },
+        
+        // ✅ Stock
+        totalStock: variationsWithImages.reduce((sum, v) => sum + (v.stock || 0), 0),
+        
+        // ✅ Variations
+        variations: variationsWithImages,
+        
+        // ✅ Has variations
+        hasVariations: variationsWithImages.length > 1,
+        
+        _debug: {
+          variationsCount: variationsWithImages.length,
+          colorImagesCount: productObj.colorImages?.length || 0,
+          colorsDetailedCount: colorsDetailed.length,
+          hasMainVariationImages: mainVariation?.images?.length > 0
+        }
       };
-    });
-    
-    // Total count
-    const total = await Product.countDocuments(query);
-    
+    }));
+
     res.status(200).json({
       success: true,
-      count: processedProducts.length,
-      total,
-      pagination: {
-        page,
-        limit,
-        pages: Math.ceil(total / limit),
-        hasNext: page * limit < total,
-        hasPrev: page > 1
-      },
-      data: processedProducts
+      data: processedProducts,
+      count: processedProducts.length
     });
+    
   } catch (error) {
+    console.error('Error in getAllProducts:', error);
     next(error);
   }
 };
@@ -594,6 +791,17 @@ exports.createProduct = async (req, res, next) => {
       
       return newVariation;
     });
+
+        let categoryPath = [req.body.category];
+    if (req.body.subCategory) {
+      categoryPath.push(req.body.subCategory);
+    }
+    if (req.body.childCategory) { // level 2 के लिए
+      categoryPath.push(req.body.childCategory);
+    }
+    if (req.body.grandChildCategory) { // level 3 के लिए
+      categoryPath.push(req.body.grandChildCategory);
+    }
     
     // Prepare product data
     const productData = {
@@ -602,6 +810,7 @@ exports.createProduct = async (req, res, next) => {
       sku: req.body.sku,
       category: req.body.category,
       subCategory: req.body.subCategory,
+      categoryPath: categoryPath, 
       cost: req.body.cost || undefined,
       stock: req.body.stock,
       description: req.body.description,
@@ -2211,6 +2420,48 @@ exports.getSubCategoriesByCategorySlug = async (req, res, next) => {
     next(error);
   }
 };
+// Get subcategories by category ID
+exports.getSubCategoriesByCategoryId = async (req, res, next) => {
+  try {
+    const { categoryId } = req.params;
+    
+    // Find subcategories (where parent = categoryId)
+    const subCategories = await Category.find({ 
+      parent: categoryId,
+      status: 'active'
+    }).sort('sortOrder');
+    
+    res.status(200).json({
+      success: true,
+      data: subCategories
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get category by slug
+exports.getCategoryBySlug = async (req, res, next) => {
+  try {
+    const { slug } = req.params;
+    
+    const category = await Category.findOne({ slug, status: 'active' });
+    
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: 'Category not found'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: category
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // Get products by category slug
 exports.getProductsByCategorySlug = async (req, res, next) => {
@@ -2332,6 +2583,139 @@ exports.getProductsByCategorySlug = async (req, res, next) => {
   }
 };
 
+exports.getProductsByCategoryPath = async (req, res, next) => {
+  try {
+    const categoryPath = req.params[0].split('/');
+    
+    // कैटेगरी चेन ट्रैवर्स करो
+    let currentCategory = null;
+    let parentId = null;
+    const categoryIds = []; // सभी कैटेगरी IDs स्टोर करो
+    
+    for (const slug of categoryPath) {
+      const query = { slug, status: 'active' };
+      if (parentId) {
+        query.parent = parentId;
+      }
+      
+      const category = await Category.findOne(query);
+      if (!category) {
+        return res.status(404).json({
+          success: false,
+          message: `Category not found: ${slug}`
+        });
+      }
+      
+      categoryIds.push(category._id); // ID स्टोर करो
+      currentCategory = category;
+      parentId = category._id;
+    }
+    
+    // Products लाओ - categoryPath में आखिरी कैटेगरी ID होनी चाहिए
+    // यानी categoryPath के आखिरी एलिमेंट से मैच करो
+    const lastCategoryId = categoryIds[categoryIds.length - 1];
+    
+    const products = await Product.find({ 
+      categoryPath: lastCategoryId, // categoryPath में ये ID होनी चाहिए
+      status: 'active'
+    })
+      .populate('category', 'name slug')
+      .populate('subCategory', 'name slug')
+      .sort('-createdAt');
+
+    // अगर categoryPath से न मिले तो subCategory से भी ढूंढो
+    let finalProducts = products;
+    if (finalProducts.length === 0) {
+      // सीधे subCategory से ढूंढो
+      finalProducts = await Product.find({ 
+        subCategory: lastCategoryId,
+        status: 'active'
+      })
+        .populate('category', 'name slug')
+        .populate('subCategory', 'name slug')
+        .sort('-createdAt');
+    }
+
+    // Process products (तुम्हारा existing code)
+    const processedProducts = await Promise.all(finalProducts.map(async (product) => {
+      // ... तुम्हारा processing code
+      const productObj = product.toObject();
+      
+      // variationsWithImages निकालो
+      let variationsWithImages = [];
+      if (productObj.variations) {
+        variationsWithImages = productObj.variations.map(variation => {
+          const variationObj = { ...variation };
+          
+          const colorAttr = variationObj.attributes?.find(
+            a => a.name?.toLowerCase() === 'color'
+          );
+          
+          if (colorAttr && productObj.colorImages) {
+            const colorGroup = productObj.colorImages.find(
+              c => c.color === colorAttr.value
+            );
+            if (colorGroup) {
+              variationObj.images = colorGroup.images;
+            }
+          }
+          
+          return variationObj;
+        });
+      }
+      
+      const mainVariation = variationsWithImages.find(v => v.isMain) || variationsWithImages[0];
+      
+      const colorMap = new Map();
+      variationsWithImages.forEach(variation => {
+        const colorAttr = variation.attributes?.find(
+          a => a.name?.toLowerCase() === 'color'
+        );
+        
+        if (colorAttr && colorAttr.value) {
+          const color = colorAttr.value;
+          if (!colorMap.has(color)) {
+            colorMap.set(color, {
+              name: color,
+              variationIds: [],
+              count: 0,
+              images: variation.images || []
+            });
+          }
+          colorMap.get(color).variationIds.push(variation._id);
+          colorMap.get(color).count++;
+        }
+      });
+      
+      const colorsDetailed = Array.from(colorMap.values());
+      
+      const prices = variationsWithImages.map(v => v.price || 0);
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+      
+      return {
+        ...productObj,
+        mainVariation,
+        allColors: colorsDetailed.map(c => c.name),
+        colorsDetailed,
+        priceRange: { min: minPrice, max: maxPrice },
+        variations: variationsWithImages
+      };
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: processedProducts,
+      category: currentCategory
+    });
+    
+  } catch (error) {
+    console.error('Error:', error);
+    next(error);
+  }
+};
+
+// Get products by subcategory slug
 // Get products by subcategory slug
 exports.getProductsBySubCategorySlug = async (req, res, next) => {
   try {
@@ -2370,74 +2754,49 @@ exports.getProductsBySubCategorySlug = async (req, res, next) => {
       .sort('-createdAt')
       .limit(50);
 
-    // ✅ NEW: Process products with proper image handling
+    // ✅ Process products with ALL attributes
     const processedProducts = await Promise.all(products.map(async (product) => {
-      // Convert to object to access virtual fields
+      // Convert to object to access all fields
       const productObj = product.toObject();
       
-      // ✅ METHOD 1: Try to use virtual field first
+      // ✅ 1. Product level attributes - यही missing है
+      const productAttributes = productObj.attributes || [];
+      
+      // ✅ 2. Get variations with images
       let variationsWithImages = [];
       
+      // Try to use virtual field first
       if (product.variationsWithImages && product.variationsWithImages.length > 0) {
-        // Use the virtual field
         variationsWithImages = product.variationsWithImages;
-      } else if (productObj.variationsWithImages && productObj.variationsWithImages.length > 0) {
-        // Use from toObject()
-        variationsWithImages = productObj.variationsWithImages;
       } else {
-        // ✅ METHOD 2: Manual merge - CORRECT VERSION
-        // Get product with colorImages
-        const freshProduct = await Product.findById(product._id);
-        const freshProductObj = freshProduct.toObject();
-        
-        if (freshProductObj.variations && freshProductObj.colorImages) {
-          variationsWithImages = freshProductObj.variations.map(variation => {
-            const variationObj = { ...variation };
-            
-            // Find color in variation attributes
-            const colorAttr = variationObj.attributes?.find(attr => 
-              attr.name && attr.name.toLowerCase() === 'color'
+        // Manual merge
+        variationsWithImages = productObj.variations.map(variation => {
+          const variationObj = { ...variation };
+          
+          // Find color in variation attributes
+          const colorAttr = variationObj.attributes?.find(attr => 
+            attr.name && attr.name.toLowerCase() === 'color'
+          );
+          
+          if (colorAttr && colorAttr.value) {
+            // Find matching color in colorImages
+            const colorImageGroup = productObj.colorImages?.find(ci => 
+              ci.color === colorAttr.value
             );
             
-            if (colorAttr && colorAttr.value) {
-              // Find matching color in colorImages
-              const colorImageGroup = freshProductObj.colorImages.find(ci => 
-                ci.color === colorAttr.value
-              );
-              
-              if (colorImageGroup && colorImageGroup.images) {
-                variationObj.images = colorImageGroup.images;
-              }
+            if (colorImageGroup && colorImageGroup.images) {
+              variationObj.images = colorImageGroup.images;
             }
-            
-            return variationObj;
-          });
-        }
+          }
+          
+          return variationObj;
+        });
       }
       
-      // Find main variation
+      // ✅ 3. Find main variation
       const mainVariation = variationsWithImages.find(v => v.isMain === true) || variationsWithImages[0];
       
-      // ✅ Extract ALL unique attributes for dynamic filters
-      const allAttributesMap = new Map(); // Store all attribute names and values
-      
-      variationsWithImages.forEach(variation => {
-        if (variation.attributes && Array.isArray(variation.attributes)) {
-          variation.attributes.forEach(attr => {
-            if (attr.name && attr.value) {
-              const attrName = attr.name.toLowerCase();
-              const attrValue = attr.value.toString().trim();
-              
-              if (!allAttributesMap.has(attrName)) {
-                allAttributesMap.set(attrName, new Set());
-              }
-              allAttributesMap.get(attrName).add(attrValue);
-            }
-          });
-        }
-      });
-      
-      // ✅ Extract unique colors with their variation IDs and IMAGES
+      // ✅ 4. Extract colors with images
       const colorMap = new Map();
       
       variationsWithImages.forEach(variation => {
@@ -2453,7 +2812,7 @@ exports.getProductsBySubCategorySlug = async (req, res, next) => {
               name: color,
               variationIds: [],
               count: 0,
-              images: variation.images || [] // ✅ Store images for this color
+              images: variation.images || []
             });
           }
           
@@ -2463,9 +2822,14 @@ exports.getProductsBySubCategorySlug = async (req, res, next) => {
         }
       });
       
-      // Convert to array
       const colorsDetailed = Array.from(colorMap.values());
-
+      
+      // ✅ 5. Price range
+      const prices = variationsWithImages.map(v => v.price || 0);
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+      
+      // ✅ 6. Return complete product object
       return {
         // Basic product info
         _id: productObj._id,
@@ -2481,7 +2845,10 @@ exports.getProductsBySubCategorySlug = async (req, res, next) => {
         bestseller: productObj.bestseller,
         createdAt: productObj.createdAt,
         
-        // ✅ Main variation with IMAGES
+        // ✅ IMPORTANT: Product level attributes
+        attributes: productAttributes,
+        
+        // ✅ Main variation with images
         mainVariation: mainVariation ? {
           _id: mainVariation._id,
           sku: mainVariation.sku,
@@ -2490,7 +2857,7 @@ exports.getProductsBySubCategorySlug = async (req, res, next) => {
           stock: mainVariation.stock,
           status: mainVariation.status,
           isMain: mainVariation.isMain,
-          images: mainVariation.images || [], // ✅ Should now have images
+          images: mainVariation.images || [],
           attributes: mainVariation.attributes || []
         } : null,
         
@@ -2498,36 +2865,28 @@ exports.getProductsBySubCategorySlug = async (req, res, next) => {
         allColors: colorsDetailed.map(c => c.name),
         colorsDetailed: colorsDetailed,
         
-        // Price range
-        priceRange: variationsWithImages.length > 0 ? {
-          min: Math.min(...variationsWithImages.map(v => v.price || 0)),
-          max: Math.max(...variationsWithImages.map(v => v.price || 0))
-        } : { min: 0, max: 0 },
+        // ✅ Price range
+        priceRange: { min: minPrice, max: maxPrice },
         
-        // Total stock
+        // ✅ Total stock
         totalStock: variationsWithImages.reduce((sum, v) => sum + (v.stock || 0), 0),
         
-        // ✅ Store all attributes for dynamic filtering
-        allAttributes: Array.from(allAttributesMap.entries()).map(([name, values]) => ({
-          name: name,
-          values: Array.from(values)
-        })),
-        
-        // ✅ Store all variations for future use
-        variations: variationsWithImages,
-        
-        // Debug info
-        _debug: {
-          variationsCount: productObj.variations?.length || 0,
-          colorImagesCount: productObj.colorImages?.length || 0,
-          variationsWithImagesCount: variationsWithImages.length,
-          mainVariationHasImages: mainVariation?.images?.length > 0,
-          firstColorImages: colorsDetailed[0]?.images?.length || 0
-        }
+        // ✅ All variations with their attributes
+        variations: variationsWithImages.map(v => ({
+          _id: v._id,
+          sku: v.sku,
+          price: v.price,
+          comparePrice: v.comparePrice,
+          stock: v.stock,
+          status: v.status,
+          isMain: v.isMain,
+          images: v.images || [],
+          attributes: v.attributes || []  // Variation attributes (size, color etc)
+        }))
       };
     }));
 
-    // ✅ Collect ALL dynamic attributes across all products for filters
+    // ✅ Collect ALL dynamic attributes for filters
     const allFilters = {
       colors: new Set(),
       attributes: {} // Dynamic structure for all attributes
@@ -2542,15 +2901,33 @@ exports.getProductsBySubCategorySlug = async (req, res, next) => {
         });
       }
       
-      // Collect dynamic attributes
-      if (product.allAttributes) {
-        product.allAttributes.forEach(attr => {
-          if (!allFilters.attributes[attr.name]) {
-            allFilters.attributes[attr.name] = new Set();
+      // Collect product level attributes
+      if (product.attributes) {
+        product.attributes.forEach(attr => {
+          if (attr.name && attr.value) {
+            const attrName = attr.name.toLowerCase();
+            if (!allFilters.attributes[attrName]) {
+              allFilters.attributes[attrName] = new Set();
+            }
+            allFilters.attributes[attrName].add(attr.value);
           }
-          attr.values.forEach(value => {
-            allFilters.attributes[attr.name].add(value);
-          });
+        });
+      }
+      
+      // Collect variation level attributes
+      if (product.variations) {
+        product.variations.forEach(variation => {
+          if (variation.attributes) {
+            variation.attributes.forEach(attr => {
+              if (attr.name && attr.value && attr.name.toLowerCase() !== 'color') {
+                const attrName = attr.name.toLowerCase();
+                if (!allFilters.attributes[attrName]) {
+                  allFilters.attributes[attrName] = new Set();
+                }
+                allFilters.attributes[attrName].add(attr.value);
+              }
+            });
+          }
         });
       }
     });
@@ -2570,13 +2947,30 @@ exports.getProductsBySubCategorySlug = async (req, res, next) => {
       }
     });
     
-    // Count dynamic attributes
+    // Count product level attributes
+    processedProducts.forEach(product => {
+      if (product.attributes) {
+        product.attributes.forEach(attr => {
+          if (attr.name && attr.value) {
+            const attrName = attr.name.toLowerCase();
+            if (!attributeCounts[attrName]) {
+              attributeCounts[attrName] = {};
+            }
+            const attrValue = attr.value.toString();
+            attributeCounts[attrName][attrValue] = 
+              (attributeCounts[attrName][attrValue] || 0) + 1;
+          }
+        });
+      }
+    });
+    
+    // Count variation attributes
     processedProducts.forEach(product => {
       if (product.variations) {
         product.variations.forEach(variation => {
           if (variation.attributes) {
             variation.attributes.forEach(attr => {
-              if (attr.name && attr.value) {
+              if (attr.name && attr.value && attr.name.toLowerCase() !== 'color') {
                 const attrName = attr.name.toLowerCase();
                 if (!attributeCounts[attrName]) {
                   attributeCounts[attrName] = {};
@@ -2596,11 +2990,10 @@ exports.getProductsBySubCategorySlug = async (req, res, next) => {
       colors: Array.from(allFilters.colors).map(color => ({
         name: color,
         count: colorCounts[color] || 1,
-        colorCode: color // Assuming color is hex code
+        colorCode: color
       })).sort((a, b) => b.count - a.count),
       
-      // ✅ Dynamic attributes filters
-      dynamicAttributes: Object.keys(allFilters.attributes || {}).map(attrName => {
+      dynamicAttributes: Object.keys(allFilters.attributes).map(attrName => {
         const values = Array.from(allFilters.attributes[attrName] || []);
         return {
           name: attrName,
@@ -2609,17 +3002,15 @@ exports.getProductsBySubCategorySlug = async (req, res, next) => {
             name: value,
             count: attributeCounts[attrName]?.[value] || 1
           })).sort((a, b) => {
-            // Try to sort numerically first
             const aNum = parseInt(a.name);
             const bNum = parseInt(b.name);
             if (!isNaN(aNum) && !isNaN(bNum)) {
               return aNum - bNum;
             }
-            // Otherwise alphabetically
             return a.name.localeCompare(b.name);
           })
         };
-      }).filter(attr => attr.name !== 'color') // Exclude color as it's already handled separately
+      })
     };
     
     res.status(200).json({
@@ -2627,8 +3018,9 @@ exports.getProductsBySubCategorySlug = async (req, res, next) => {
       data: processedProducts,
       category: category,
       subCategory: subCategory,
-      filters: filtersData // ✅ Send dynamic filters
+      filters: filtersData
     });
+    
   } catch (error) {
     console.error('Error in getProductsBySubCategorySlug:', error);
     next(error);

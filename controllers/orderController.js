@@ -916,44 +916,128 @@ exports.getMyOrders = async (req, res, next) => {
 
 exports.getAllOrders = async (req, res, next) => {
   try {
-    const features = new APIFeatures(Order.find(), req.query)
-      .filter()
-      .sort()
-      .limitFields()
-      .paginate();
     
-    const orders = await features.query
-      .populate('customer', 'firstName lastName email phone')
-      .populate('createdBy', 'name email');
+    // First, check if orders exist in database without any filters
+    const totalOrdersInDB = await Order.countDocuments();
+
+    // Create a base query
+    let query = Order.find();
     
-    const total = await Order.countDocuments(features.filterQuery);
+    // Apply filters manually for debugging
+    const queryObj = { ...req.query };
+    const excludedFields = ['page', 'sort', 'limit', 'fields', 'search', 'status', 'paymentStatus', 'dateRange'];
+    excludedFields.forEach(field => delete queryObj[field]);
     
-    // Calculate summary stats
-    const stats = await Order.aggregate([
-      { $match: features.filterQuery },
-      {
-        $group: {
-          _id: null,
-          totalRevenue: { $sum: '$total' },
-          totalOrders: { $sum: 1 },
-          averageOrder: { $avg: '$total' }
-        }
+    // Apply status filter if provided and not 'all'
+    if (req.query.status && req.query.status !== 'all') {
+      query = query.where('status').equals(req.query.status);
+    }
+    
+    // Apply payment status filter if provided and not 'all'
+    if (req.query.paymentStatus && req.query.paymentStatus !== 'all') {
+      query = query.where('paymentStatus').equals(req.query.paymentStatus);
+    }
+    
+    // Apply search filter
+    if (req.query.search) {
+      const searchRegex = new RegExp(req.query.search, 'i');
+      query = query.or([
+        { orderId: searchRegex },
+        { 'customer.name': searchRegex },
+        { 'customer.email': searchRegex }
+      ]);
+    }
+    
+    // Apply date range filter
+    if (req.query.dateRange && req.query.dateRange !== 'all') {
+      const now = new Date();
+      let startDate;
+      
+      switch(req.query.dateRange) {
+        case 'today':
+          startDate = new Date(now.setHours(0, 0, 0, 0));
+          break;
+        case 'week':
+          startDate = new Date(now.setDate(now.getDate() - 7));
+          break;
+        case 'month':
+          startDate = new Date(now.setMonth(now.getMonth() - 1));
+          break;
+        case 'year':
+          startDate = new Date(now.setFullYear(now.getFullYear() - 1));
+          break;
+        default:
+          startDate = null;
       }
-    ]);
+      
+      if (startDate) {
+        query = query.where('createdAt').gte(startDate);
+      }
+    }
+    
+    // Apply sorting
+    if (req.query.sort) {
+      const sortBy = req.query.sort.split(',').join(' ');
+      query = query.sort(sortBy);
+    } else {
+      query = query.sort('-createdAt');
+    }
+    
+    // Count total before pagination (for pagination info)
+    const filterQuery = query._conditions;
+    
+    const total = await Order.countDocuments(filterQuery);
+    
+    // Apply pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    
+    query = query.skip(skip).limit(limit);
+    
+    // Execute query with population
+    const orders = await query
+      .populate('customer', 'name email phone')
+      .populate('createdBy', 'name email')
+    
+    // Calculate summary stats for filtered orders
+    let stats = [];
+    try {
+      stats = await Order.aggregate([
+        { $match: filterQuery },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: '$total' },
+            totalOrders: { $sum: 1 },
+            averageOrder: { $avg: '$total' }
+          }
+        }
+      ]);
+    } catch (statsError) {
+      console.error('Error calculating stats:', statsError);
+    }
     
     res.status(200).json({
       success: true,
       count: orders.length,
       total,
-      summary: stats[0] || { totalRevenue: 0, totalOrders: 0, averageOrder: 0 },
+      summary: stats[0] || { 
+        totalRevenue: 0, 
+        totalOrders: total, 
+        averageOrder: total > 0 ? 
+          orders.reduce((acc, order) => acc + order.total, 0) / total : 0 
+      },
       pagination: {
-        page: parseInt(req.query.page) || 1,
-        limit: parseInt(req.query.limit) || 10,
-        pages: Math.ceil(total / (req.query.limit || 10))
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
       },
       data: orders
     });
+    
   } catch (error) {
+    console.error('Error in getAllOrders:', error);
     next(error);
   }
 };

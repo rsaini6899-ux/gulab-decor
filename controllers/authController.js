@@ -236,7 +236,6 @@ exports.googleAuth = async (req, res) => {
         lastLogin: Date.now(),
       });
     } else {
-      console.log('User exists, updating last login');
       user.lastLogin = Date.now();
       await user.save();
     }
