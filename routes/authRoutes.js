@@ -43,7 +43,6 @@ router.post('/logout', authMiddleware, authController.logout);
 
 // Admin only routes (if needed)
 router.get('/users', authMiddleware, authController.getAllUsers);
-// router.get('/users/:id', authMiddleware, authController.getUserDetails);
 router.get('/users/:id', authMiddleware, authController.getUserById);
 router.put('/users/:id', authMiddleware, authController.updateUser);
 router.delete('/users/:id', authMiddleware, authController.deleteUser);

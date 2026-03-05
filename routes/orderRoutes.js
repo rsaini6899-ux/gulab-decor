@@ -33,6 +33,7 @@ router.post('/verify-razorpay-payment', authMiddleware,  orderController.verifyR
 // Order management routes
 router.put('/cancel/:orderId', authMiddleware, orderController.cancelOrder);
 
+// new
 router.get('/customer/:customerId', authMiddleware, orderController.getCustomerOrders);
 
 
