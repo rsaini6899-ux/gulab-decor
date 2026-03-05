@@ -42,31 +42,33 @@ const getFullImageUrl = (req, filePath) => {
   
   // ✅ Check if it's already a full URL
   if (filePath.startsWith('http')) {
+    // Agar http se aaya hai to https me convert karein
+    if (process.env.NODE_ENV === 'production' && filePath.startsWith('http://')) {
+      return filePath.replace('http://', 'https://');
+    }
     return filePath;
   }
   
-  // ✅ Production me HTTPS force karein
-  let protocol = req.protocol;
-  if (process.env.NODE_ENV === 'production') {
-    protocol = 'https';
-  }
+  // ✅ Production me always HTTPS use karein
+  const host = req.get('host');
+  const protocol = process.env.NODE_ENV === 'production' ? 'https' : req.protocol;
   
   // ✅ If it's an absolute Windows path like "E:\vidhalay\..."
   if (filePath.includes(':\\') || filePath.includes('E:/')) {
     const uploadsIndex = filePath.indexOf('uploads');
     if (uploadsIndex !== -1) {
       const relativePath = filePath.substring(uploadsIndex);
-      return `${protocol}://${req.get('host')}/${relativePath.replace(/\\/g, '/')}`;
+      return `${protocol}://${host}/${relativePath.replace(/\\/g, '/')}`;
     }
   }
   
   // ✅ If it's already a relative path starting with uploads
   if (filePath.startsWith('uploads/') || filePath.startsWith('/uploads/')) {
     const cleanPath = filePath.replace(/\\/g, '/').replace(/^\/+/, '');
-    return `${protocol}://${req.get('host')}/${cleanPath}`;
+    return `${protocol}://${host}/${cleanPath}`;
   }
   
   // ✅ Default: return as is
   const formattedPath = filePath.replace(/\\/g, '/').replace(/^\/+/, '');
-  return `${protocol}://${req.get('host')}/${formattedPath}`;
+  return `${protocol}://${host}/${formattedPath}`;
 };
