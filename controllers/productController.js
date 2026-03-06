@@ -2220,7 +2220,9 @@ exports.getProductBySlug = async (req, res, next) => {
       }
       
       // Get first image URL for display
-      const displayImageUrl = displayImages.length > 0 ? displayImages[0].url : null;
+      // const displayImageUrl = displayImages.map(img => img.url)[0] || null;
+      const mainImageObj = displayImages.find(img => img.isMain === true) || displayImages[0];
+      const displayImageUrl = mainImageObj?.url || null;       
 
       return {
         // Basic product info
