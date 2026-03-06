@@ -1,6 +1,7 @@
 const Product = require('../models/Product');
 const Category = require('../models/Category');
 const APIFeatures = require('../utils/APIFeatures');
+const getFullImageUrl = require('../utils/getFullImageUrl');
 
 const validateVariations = (variations) => {
   if (!variations || !Array.isArray(variations)) return true;
@@ -1903,6 +1904,56 @@ exports.updateAttributes = async (req, res, next) => {
 };
 
 // Add images to variation
+// exports.addImagesToVariation = async (req, res, next) => {
+//   try {
+//     const { id, variationId } = req.params;
+    
+//     const product = await Product.findById(id);
+//     if (!product) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Product not found'
+//       });
+//     }
+    
+//     const variation = product.variations.id(variationId);
+//     if (!variation) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Variation not found'
+//       });
+//     }
+    
+//     //  CORRECT: Check if req.files exists
+//     if (!req.files || req.files.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'No images provided'
+//       });
+//     }
+    
+//     // Process uploaded images
+//     const images = req.files.map((file, index) => ({
+//       url: file.fullUrl || file.path || file.location,
+//       public_id: file.filename || file.key,
+//       isMain: variation.images.length === 0 && index === 0, // First image as main
+//       order: variation.images.length + index
+//     }));
+    
+//     // Add images to variation
+//     variation.images = [...variation.images, ...images];
+//     await product.save();
+    
+//     res.status(200).json({
+//       success: true,
+//       message: 'Images added to variation successfully',
+//       data: variation.images
+//     });
+//   } catch (error) {
+//     console.error('❌ Error adding images to variation:', error);
+//     next(error);
+//   }
+// };
 exports.addImagesToVariation = async (req, res, next) => {
   try {
     const { id, variationId } = req.params;
@@ -1923,7 +1974,7 @@ exports.addImagesToVariation = async (req, res, next) => {
       });
     }
     
-    //  CORRECT: Check if req.files exists
+    // Check if req.files exists
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
         success: false,
@@ -1931,13 +1982,19 @@ exports.addImagesToVariation = async (req, res, next) => {
       });
     }
     
-    // Process uploaded images
-    const images = req.files.map((file, index) => ({
-      url: file.fullUrl || file.path || file.location,
-      public_id: file.filename || file.key,
-      isMain: variation.images.length === 0 && index === 0, // First image as main
-      order: variation.images.length + index
-    }));
+    // ✅ Process uploaded images with URL generation
+    const images = req.files.map((file, index) => {
+      // Generate URL for each file
+      const filePath = file.path || file.filename || `uploads/products/${file.filename}`;
+      const imageUrl = getFullImageUrl(req, filePath);
+      
+      return {
+        url: imageUrl,  // ✅ GENERATED URL
+        public_id: file.filename || file.key,
+        isMain: variation.images.length === 0 && index === 0, // First image as main
+        order: variation.images.length + index
+      };
+    });
     
     // Add images to variation
     variation.images = [...variation.images, ...images];
@@ -2317,10 +2374,46 @@ exports.getProductDetails = async (req, res, next) => {
 };
 
 // Upload product images
+// exports.uploadProductImages = async (req, res, next) => {
+//   try {
+    
+//     // ✅ CORRECT: When using upload.array(), files come directly in req.files (not req.files.images)
+//     if (!req.files || req.files.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'No images provided'
+//       });
+//     }
+    
+//     const uploadedImages = req.files.map(file => {
+      
+//       return {
+//         url: file.fullUrl,
+//         public_id: file.filename,
+//         folder: file.folder,
+//         path: file.path,
+//         size: file.size,
+//         mimetype: file.mimetype
+//       };
+//     });
+    
+//     res.status(200).json({
+//       success: true,
+//       message: 'Images uploaded successfully',
+//       data: {
+//         images: uploadedImages,
+//         count: uploadedImages.length
+//       }
+//     });
+//   } catch (error) {
+//     console.error('❌ Error uploading images:', error);
+//     next(error);
+//   }
+// };
 exports.uploadProductImages = async (req, res, next) => {
   try {
     
-    // ✅ CORRECT: When using upload.array(), files come directly in req.files (not req.files.images)
+    // When using upload.array(), files come directly in req.files
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
         success: false,
@@ -2328,12 +2421,16 @@ exports.uploadProductImages = async (req, res, next) => {
       });
     }
     
+    // ✅ Process uploaded images with URL generation
     const uploadedImages = req.files.map(file => {
+      // Generate URL for each file
+      const filePath = file.path || file.filename || `uploads/products/${file.filename}`;
+      const imageUrl = getFullImageUrl(req, filePath);
       
       return {
-        url: file.fullUrl,
+        url: imageUrl,  // ✅ GENERATED URL
         public_id: file.filename,
-        folder: file.folder,
+        folder: file.folder || 'products',
         path: file.path,
         size: file.size,
         mimetype: file.mimetype
