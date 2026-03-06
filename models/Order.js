@@ -114,6 +114,22 @@ const orderSchema = new mongoose.Schema(
       type: shippingAddressSchema,
       required: false,
     },
+    couponCode: {
+    type: String,
+    default: null
+  },
+  
+  discountAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  
+  discountType: {
+    type: String,
+    enum: ['percentage', 'fixed', 'shipping', null],
+    default: null
+  },
     subtotal: {
       type: Number,
       required: true,

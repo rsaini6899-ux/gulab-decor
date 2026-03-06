@@ -7,7 +7,10 @@ const couponController = require('../controllers/couponController');
 // router.use(authMiddleware);
 
 // Public route for coupon validation (not protected for customers)
-router.post('/apply', couponController.applyCoupon);
+router.route('/apply')
+.get(couponController.validateCouponForCustomer)
+.post(couponController.applyCoupon)
+
 
 // Admin routes
 router.route('/')

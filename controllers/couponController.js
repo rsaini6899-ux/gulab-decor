@@ -365,6 +365,26 @@ exports.toggleVisibility = async (req, res, next) => {
   });
 }
 
+exports.validateCouponForCustomer = async (req, res, next) => {
+  try {
+    const coupons = await Coupon.find({ 
+      isActive: true, 
+      endDate: { $gte: new Date() },
+      showFrontend: true
+    }).select('code title description discountType discountValue minOrderAmount maxDiscountAmount startDate endDate userLimit usedCount');
+    res.status(200).json({
+      success: true,
+      data: coupons
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching coupons',
+      error: error.message
+    });
+  }
+}
+
 // Apply coupon to order
 exports.applyCoupon = async (req, res, next) => {
   const { code, orderAmount } = req.body;
