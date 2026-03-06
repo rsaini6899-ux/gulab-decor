@@ -367,16 +367,38 @@ exports.toggleVisibility = async (req, res, next) => {
 
 exports.validateCouponForCustomer = async (req, res, next) => {
   try {
+    const userId = req.user?.id; // Agar user login hai to
+    
     const coupons = await Coupon.find({ 
       isActive: true, 
       endDate: { $gte: new Date() },
       showFrontend: true
-    }).select('code title description discountType discountValue minOrderAmount maxDiscountAmount startDate endDate userLimit usedCount');
+    }).select('code title description discountType discountValue minOrderAmount maxDiscountAmount startDate endDate userLimit usedCount usedBy');
+    
+    // 🎯 Add userAlreadyUsed flag for each coupon
+    const couponsWithUserInfo = coupons.map(coupon => {
+      const couponObj = coupon.toObject();
+      
+      if (userId) {
+        couponObj.userAlreadyUsed = coupon.usedBy.some(entry => 
+          entry.userId && entry.userId.toString() === userId.toString()
+        );
+      } else {
+        couponObj.userAlreadyUsed = false;
+      }
+      
+      // Calculate remaining uses
+      couponObj.remainingUses = coupon.userLimit - coupon.usedCount;
+      
+      return couponObj;
+    });
+    
     res.status(200).json({
       success: true,
-      data: coupons
+      data: couponsWithUserInfo
     });
   } catch (error) {
+    console.error('Error fetching coupons:', error);
     res.status(500).json({
       success: false,
       message: 'Server error fetching coupons',
@@ -386,29 +408,128 @@ exports.validateCouponForCustomer = async (req, res, next) => {
 }
 
 // Apply coupon to order
-exports.applyCoupon = async (req, res, next) => {
-  const { code, orderAmount } = req.body;
-  
-  if (!code || !orderAmount) {
-    return 'Coupon code and order amount are required'
-  }
-  
-  const result = await Coupon.validateCoupon(code, parseFloat(orderAmount));
-  
-  if (!result.valid) {
-    return result.message
-  }
-  
-  res.status(200).json({
-    success: true,
-    message: 'Coupon applied successfully',
-    data: {
-      coupon: result.coupon,
-      discount: result.discount,
-      finalAmount: result.finalAmount
+exports.applyCoupon = async (req, res) => {
+  try {
+    const { code, orderAmount } = req.body;
+    const userId = req.user?.id; // Get user ID from auth middleware
+    
+    
+    if (!code || !orderAmount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Coupon code and order amount are required'
+      });
     }
-  });
-}
+    
+    // Find coupon
+    const coupon = await Coupon.findOne({ 
+      code: code.toUpperCase(), 
+      isActive: true,
+      startDate: { $lte: new Date() },
+      endDate: { $gte: new Date() }
+    });
+    
+    console.log('Found coupon:', coupon ? {
+      id: coupon._id,
+      code: coupon.code,
+      usedCount: coupon.usedCount,
+      userLimit: coupon.userLimit,
+      usedBy: coupon.usedBy.map(u => ({
+        userId: u.userId?.toString(),
+        usedAt: u.usedAt
+      }))
+    } : 'No coupon found');
+    
+    if (!coupon) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired coupon'
+      });
+    }
+    
+    // 🎯 IMPORTANT: Check if user has already used this coupon
+    if (userId) {
+      console.log('Checking if user', userId, 'has used this coupon');
+      
+      const userAlreadyUsed = coupon.usedBy.some(entry => {
+        const entryUserId = entry.userId?.toString();
+        const currentUserId = userId.toString();
+        console.log(`Comparing: ${entryUserId} === ${currentUserId}?`, entryUserId === currentUserId);
+        return entryUserId === currentUserId;
+      });
+      
+      console.log('User already used:', userAlreadyUsed);
+      
+      if (userAlreadyUsed) {
+        return res.status(400).json({
+          success: false,
+          message: 'You have already used this coupon'
+        });
+      }
+    } else {
+      console.log('No userId found in request!');
+    }
+    
+    // Check usage limit
+    if (coupon.usedCount >= coupon.userLimit) {
+      return res.status(400).json({
+        success: false,
+        message: 'Coupon usage limit reached'
+      });
+    }
+    
+    // Check minimum order amount
+    if (orderAmount < coupon.minOrderAmount) {
+      return res.status(400).json({
+        success: false,
+        message: `Minimum order amount is ₹${coupon.minOrderAmount}`
+      });
+    }
+    
+    // Calculate discount
+    let discount = 0;
+    if (coupon.discountType === 'percentage') {
+      discount = (orderAmount * coupon.discountValue) / 100;
+      if (coupon.maxDiscountAmount && discount > coupon.maxDiscountAmount) {
+        discount = coupon.maxDiscountAmount;
+      }
+    } else if (coupon.discountType === 'fixed') {
+      discount = coupon.discountValue;
+    }
+    
+    // Round discount to 2 decimal places
+    discount = Math.round(discount * 100) / 100;
+    
+    // Prepare coupon object for response
+    const couponObj = coupon.toObject();
+    
+    // Add userAlreadyUsed flag
+    couponObj.userAlreadyUsed = userId ? 
+      coupon.usedBy.some(entry => entry.userId?.toString() === userId.toString()) : 
+      false;
+    
+    console.log('Sending response with userAlreadyUsed:', couponObj.userAlreadyUsed);
+    console.log('=========================================');
+    
+    res.status(200).json({
+      success: true,
+      message: 'Coupon applied successfully',
+      data: {
+        coupon: couponObj,
+        discount,
+        finalAmount: orderAmount - discount
+      }
+    });
+    
+  } catch (error) {
+    console.error('Apply coupon error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error applying coupon',
+      error: error.message
+    });
+  }
+};
 
 // Record coupon usage
 exports.recordUsage = async (req, res, next) => {

@@ -1,15 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const couponController = require('../controllers/couponController');
-// const authMiddleware = require('../middleware/auth');
-// const roleMiddleware = require('../middleware/role');
+const authMiddleware = require('../middleware/auth');
 
 // router.use(authMiddleware);
 
 // Public route for coupon validation (not protected for customers)
-router.route('/apply')
-.get(couponController.validateCouponForCustomer)
-.post(couponController.applyCoupon)
+router.get('/apply', couponController.validateCouponForCustomer)
+router.post('/apply', authMiddleware, couponController.applyCoupon);
 
 
 // Admin routes

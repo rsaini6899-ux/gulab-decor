@@ -152,9 +152,9 @@ couponSchema.pre('save', function(next) {
 });
 
 // Static method to validate coupon
-couponSchema.statics.validateCoupon = async function(code, orderAmount = 0) {
+couponSchema.statics.validateCoupon = async function(code, orderAmount = 0, userId = null) {
   const coupon = await this.findOne({ 
-    code, 
+    code: code.toUpperCase(), 
     isActive: true,
     startDate: { $lte: new Date() },
     endDate: { $gte: new Date() }
@@ -173,6 +173,20 @@ couponSchema.statics.validateCoupon = async function(code, orderAmount = 0) {
       valid: false, 
       message: `Minimum order amount is ₹${coupon.minOrderAmount}` 
     };
+  }
+  
+  // 🎯 Check if user has already used this coupon
+  if (userId) {
+    const userAlreadyUsed = coupon.usedBy.some(entry => 
+      entry.userId && entry.userId.toString() === userId.toString()
+    );
+    
+    if (userAlreadyUsed) {
+      return { 
+        valid: false, 
+        message: 'You have already used this coupon' 
+      };
+    }
   }
   
   // Calculate discount
