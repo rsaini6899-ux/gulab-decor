@@ -30,160 +30,143 @@ const validateVariations = (variations) => {
   return true;
 };
 
-//  Get all products with filters
-// exports.getAllProducts = async (req, res, next) => {
-//   try {
-//     const { status, limit = 100 } = req.query;
+// Get Least Products
+exports.getLeastProducts = async (req, res, next) => {
+  try {
+    const { categoryId } = req.query;
+    console.log("Category ID for least products:", categoryId);
     
-//     const query = {};
-//     if (status) {
-//       query.status = status;
-//     }
+    let query = { status: 'active' };
     
-//     const products = await Product.find(query)
-//       .populate('category', 'name slug')
-//       .populate('subCategory', 'name slug')
-//       .sort('-createdAt')
-//       .limit(parseInt(limit));
+    if (categoryId) {
+      query.category = categoryId;
+    }
+    
+    const products = await Product.find(query)
+      .populate('category', 'name slug')
+      .populate('subCategory', 'name slug')
+      .sort('createdAt')
+      .limit(10)
+      .lean();
 
-//     // Process products with same logic as category products
-//     const processedProducts = await Promise.all(products.map(async (product) => {
-//       const productObj = product.toObject();
+    const processedProducts = await Promise.all(products.map(async (product) => {
+      const productObj = product;
       
-//       // Get variations with images
-//       let variationsWithImages = [];
+      let variationsWithImages = [];
       
-//       // Try to use virtual field first
-//       if (product.variationsWithImages && product.variationsWithImages.length > 0) {
-//         variationsWithImages = product.variationsWithImages;
-//       } else if (productObj.variations && productObj.colorImages) {
-//         // Manual merge
-//         variationsWithImages = productObj.variations.map(variation => {
-//           const variationObj = { ...variation };
-          
-//           // Find color in variation attributes
-//           const colorAttr = variationObj.attributes?.find(
-//             a => a.name?.toLowerCase() === 'color'
-//           );
-          
-//           if (colorAttr && colorAttr.value && productObj.colorImages) {
-//             // Find matching color in colorImages
-//             const colorGroup = productObj.colorImages.find(
-//               c => c.color === colorAttr.value
-//             );
+      if (product.variationsWithImages && product.variationsWithImages.length > 0) {
+        variationsWithImages = product.variationsWithImages;
+      } else {
+        variationsWithImages = productObj.variations || [];
+        
+        if (productObj.colorImages && productObj.colorImages.length > 0) {
+          variationsWithImages = variationsWithImages.map(variation => {
+            const variationObj = { ...variation };
+            const colorAttr = variationObj.attributes?.find(
+              a => a.name?.toLowerCase() === 'color'
+            );
             
-//             if (colorGroup && colorGroup.images) {
-//               variationObj.images = colorGroup.images;
-//             }
-//           }
-          
-//           return variationObj;
-//         });
-//       } else {
-//         // Fallback to variations as is
-//         variationsWithImages = productObj.variations || [];
-//       }
+            if (colorAttr && colorAttr.value) {
+              const colorGroup = productObj.colorImages.find(
+                c => c.color === colorAttr.value
+              );
+              
+              if (colorGroup && colorGroup.images) {
+                variationObj.images = colorGroup.images;
+              }
+            }
+            return variationObj;
+          });
+        }
+      }
       
-//       // Find main variation
-//       const mainVariation = variationsWithImages.find(v => v.isMain === true) || variationsWithImages[0];
+      const mainVariation = variationsWithImages.find(v => v.isMain === true) || variationsWithImages[0];
       
-//       // ✅ Extract colors with their variation IDs and IMAGES (same as category products)
-//       const colorMap = new Map();
-      
-//       variationsWithImages.forEach(variation => {
-//         const colorAttr = variation.attributes?.find(
-//           a => a.name && a.name.toLowerCase() === 'color'
-//         );
-        
-//         if (colorAttr && colorAttr.value) {
-//           const color = colorAttr.value;
-          
-//           if (!colorMap.has(color)) {
-//             colorMap.set(color, {
-//               name: color,
-//               variationIds: [],
-//               count: 0,
-//               images: variation.images || [] // Store images for this color
-//             });
-//           }
-          
-//           const colorInfo = colorMap.get(color);
-//           colorInfo.variationIds.push(variation._id);
-//           colorInfo.count++;
-//         }
-//       });
-      
-//       // Convert to array
-//       const colorsDetailed = Array.from(colorMap.values());
-      
-//       // Price range
-//       const prices = variationsWithImages.map(v => v.price || 0);
-//       const minPrice = Math.min(...prices);
-//       const maxPrice = Math.max(...prices);
-      
-//       return {
-//         // Basic product info
-//         _id: productObj._id,
-//         name: productObj.name,
-//         slug: productObj.slug,
-//         sku: productObj.sku,
-//         description: productObj.description,
-//         shortDescription: productObj.shortDescription,
-//         category: productObj.category,
-//         subCategory: productObj.subCategory,
-//         status: productObj.status,
-//         featured: productObj.featured,
-//         bestseller: productObj.bestseller,
-//         attributes: productObj.attributes,
-//         categoryPath: productObj.categoryPath,
-//         createdAt: productObj.createdAt,
-        
-//         // Main variation with images
-//         mainVariation: mainVariation ? {
-//           _id: mainVariation._id,
-//           sku: mainVariation.sku,
-//           price: mainVariation.price,
-//           comparePrice: mainVariation.comparePrice,
-//           stock: mainVariation.stock,
-//           status: mainVariation.status,
-//           isMain: mainVariation.isMain,
-//           images: mainVariation.images || [],
-//           attributes: mainVariation.attributes || []
-//         } : null,
-        
-//         // ✅ Color information (THIS WAS MISSING!)
-//         allColors: colorsDetailed.map(c => c.name),
-//         colorsDetailed: colorsDetailed,
-        
-//         // Price range
-//         priceRange: { min: minPrice, max: maxPrice },
-        
-//         // Total stock
-//         totalStock: variationsWithImages.reduce((sum, v) => sum + (v.stock || 0), 0),
-        
-//         // All variations
-//         variations: variationsWithImages,
-        
-//         // Debug info
-//         _debug: {
-//           variationsCount: variationsWithImages.length,
-//           colorImagesCount: productObj.colorImages?.length || 0,
-//           colorsDetailedCount: colorsDetailed.length
-//         }
-//       };
-//     }));
+      // ✅ Display image सेट करें
+      let displayImage = null;
+      if (mainVariation?.images && mainVariation.images.length > 0) {
+        const mainImage = mainVariation.images.find(img => img.isMain === true);
+        if (mainImage && mainImage.url) {
+          // सीधे URL return करें, getFullImageUrl function का use न करें
+          displayImage = mainImage.url;
+          console.log(`Found main image with URL:`, mainImage.url);
+        } else {
+          const firstImage = mainVariation.images[0];
+          if (firstImage && firstImage.url) {
+            displayImage = firstImage.url;
+            console.log(`Using first image with URL:`, firstImage.url);
+          }
+        }
+      }
 
-//     res.status(200).json({
-//       success: true,
-//       data: processedProducts,
-//       count: processedProducts.length
-//     });
-    
-//   } catch (error) {
-//     console.error('Error in getAllProducts:', error);
-//     next(error);
-//   }
-// };
+      const processedMainVariation = mainVariation ? {
+        _id: mainVariation._id,
+        sku: mainVariation.sku,
+        price: mainVariation.price,
+        comparePrice: mainVariation.comparePrice,
+        stock: mainVariation.stock,
+        status: mainVariation.status,
+        isMain: mainVariation.isMain,
+        images: mainVariation.images || [],
+        attributes: mainVariation.attributes || []
+      } : null;
+      
+      // यहाँ ध्यान दें - displayImage को सीधे return कर रहे हैं
+      return {
+        _id: productObj._id,
+        name: productObj.name,
+        slug: productObj.slug,
+        sku: productObj.sku,
+        description: productObj.description,
+        shortDescription: productObj.shortDescription,
+        category: productObj.category,
+        subCategory: productObj.subCategory,
+        status: productObj.status,
+        featured: productObj.featured,
+        bestseller: productObj.bestseller,
+        createdAt: productObj.createdAt,
+        
+        // ✅ Display image - सीधे URL
+        displayImage: displayImage,
+        
+        // ✅ Main variation
+        mainVariation: processedMainVariation,
+        
+        // ✅ Colors detailed
+        colorsDetailed: (productObj.colorImages || []).map(c => ({
+          name: c.color,
+          images: c.images || []
+        })),
+        
+        // ✅ Price range
+        minPrice: variationsWithImages.length > 0 
+          ? Math.min(...variationsWithImages.map(v => v.price || 0).filter(p => p > 0))
+          : 0,
+        maxPrice: variationsWithImages.length > 0
+          ? Math.max(...variationsWithImages.map(v => v.price || 0).filter(p => p > 0))
+          : 0,
+        totalStock: variationsWithImages.reduce((sum, v) => sum + (v.stock || 0), 0)
+      };
+    }));
+
+    console.log("Processed Products:", processedProducts.map(p => ({
+      id: p._id,
+      name: p.name,
+      displayImage: p.displayImage
+    })));
+
+    res.status(200).json({
+      success: true,
+      data: processedProducts,
+      count: processedProducts.length
+    });
+  } catch (error) {
+    console.error('Error in getLeastProducts:', error);
+    next(error);
+  }
+};
+
+//  Get all products with filters
 exports.getAllProducts = async (req, res, next) => {
   try {
     const { status, limit = 100 } = req.query;
@@ -1268,52 +1251,6 @@ exports.updateStock = async (req, res, next) => {
 };
 
 // Search products
-// exports.searchProducts = async (req, res, next) => {
-//   try {
-//     const { q, category, status, minPrice, maxPrice, limit = 20 } = req.query;
-    
-//     let query = {};
-    
-//     // Text search
-//     if (q) {
-//       query.$or = [
-//         { name: { $regex: q, $options: 'i' } },
-//         { description: { $regex: q, $options: 'i' } },
-//         { sku: { $regex: q, $options: 'i' } }
-//       ];
-//     }
-    
-//     // Category filter
-//     if (category) {
-//       query.category = category;
-//     }
-    
-//     // Status filter
-//     if (status) {
-//       query.status = status;
-//     }
-    
-//     // Price range filter
-//     if (minPrice || maxPrice) {
-//       query.price = {};
-//       if (minPrice) query.price.$gte = Number(minPrice);
-//       if (maxPrice) query.price.$lte = Number(maxPrice);
-//     }
-    
-//     const products = await Product.find(query)
-//       .populate('category', 'name slug')
-//       .limit(parseInt(limit))
-//       .select('name sku stock category status');
-    
-//     res.status(200).json({
-//       success: true,
-//       count: products.length,
-//       data: products
-//     });
-//   } catch (error) {
-//     next(error);
-//   }
-// };
 exports.searchProducts = async (req, res, next) => {
   try {
     const { q, category, status, minPrice, maxPrice, limit = 20 } = req.query;
@@ -1904,56 +1841,6 @@ exports.updateAttributes = async (req, res, next) => {
 };
 
 // Add images to variation
-// exports.addImagesToVariation = async (req, res, next) => {
-//   try {
-//     const { id, variationId } = req.params;
-    
-//     const product = await Product.findById(id);
-//     if (!product) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'Product not found'
-//       });
-//     }
-    
-//     const variation = product.variations.id(variationId);
-//     if (!variation) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'Variation not found'
-//       });
-//     }
-    
-//     //  CORRECT: Check if req.files exists
-//     if (!req.files || req.files.length === 0) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'No images provided'
-//       });
-//     }
-    
-//     // Process uploaded images
-//     const images = req.files.map((file, index) => ({
-//       url: file.fullUrl || file.path || file.location,
-//       public_id: file.filename || file.key,
-//       isMain: variation.images.length === 0 && index === 0, // First image as main
-//       order: variation.images.length + index
-//     }));
-    
-//     // Add images to variation
-//     variation.images = [...variation.images, ...images];
-//     await product.save();
-    
-//     res.status(200).json({
-//       success: true,
-//       message: 'Images added to variation successfully',
-//       data: variation.images
-//     });
-//   } catch (error) {
-//     console.error('❌ Error adding images to variation:', error);
-//     next(error);
-//   }
-// };
 exports.addImagesToVariation = async (req, res, next) => {
   try {
     const { id, variationId } = req.params;
@@ -2376,42 +2263,6 @@ exports.getProductDetails = async (req, res, next) => {
 };
 
 // Upload product images
-// exports.uploadProductImages = async (req, res, next) => {
-//   try {
-    
-//     // ✅ CORRECT: When using upload.array(), files come directly in req.files (not req.files.images)
-//     if (!req.files || req.files.length === 0) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'No images provided'
-//       });
-//     }
-    
-//     const uploadedImages = req.files.map(file => {
-      
-//       return {
-//         url: file.fullUrl,
-//         public_id: file.filename,
-//         folder: file.folder,
-//         path: file.path,
-//         size: file.size,
-//         mimetype: file.mimetype
-//       };
-//     });
-    
-//     res.status(200).json({
-//       success: true,
-//       message: 'Images uploaded successfully',
-//       data: {
-//         images: uploadedImages,
-//         count: uploadedImages.length
-//       }
-//     });
-//   } catch (error) {
-//     console.error('❌ Error uploading images:', error);
-//     next(error);
-//   }
-// };
 exports.uploadProductImages = async (req, res, next) => {
   try {
     
@@ -2519,6 +2370,7 @@ exports.getSubCategoriesByCategorySlug = async (req, res, next) => {
     next(error);
   }
 };
+
 // Get subcategories by category ID
 exports.getSubCategoriesByCategoryId = async (req, res, next) => {
   try {
@@ -2814,7 +2666,6 @@ exports.getProductsByCategoryPath = async (req, res, next) => {
   }
 };
 
-// Get products by subcategory slug
 // Get products by subcategory slug
 exports.getProductsBySubCategorySlug = async (req, res, next) => {
   try {

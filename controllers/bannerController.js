@@ -67,28 +67,59 @@ exports.getAllBanners = async (req, res, next) => {
 };
 
 // Get active banners for frontend
+// exports.getActiveBanners = async (req, res, next) => {
+//   try {
+//     const { device = 'desktop' } = req.query;
+//     const now = new Date();
+
+//     const query = {
+//       status: 'active',
+//       $or: [
+//         { deviceType: 'all' },
+//         { deviceType: device }
+//       ],
+//     };
+
+//     const banners = await Banner.find({status: 'active' })
+//       .sort({ position: 1, createdAt: -1 })
+//       .select('-status -createdBy -updatedBy -__v')
+//       .lean();
+
+//     // Transform data for frontend
+//     const transformedBanners = banners.map(banner => ({
+//       id: banner._id,
+//       image: banner.image.url,
+//       image: banner.image.url,
+//       title: banner.title,
+//       subtitle: banner.subtitle,
+//       cta: banner.ctaText,
+//       ctaLink: banner.ctaLink,
+//       targetUrl: banner.targetUrl
+//     }));
+
+//     res.status(200).json(transformedBanners);
+//   } catch (error) {
+//     next(error);
+//   }
+// };
 exports.getActiveBanners = async (req, res, next) => {
   try {
     const { device = 'desktop' } = req.query;
     const now = new Date();
 
-    const query = {
-      status: 'active',
-      $or: [
-        { deviceType: 'all' },
-        { deviceType: device }
-      ],
-    };
-
-    const banners = await Banner.find(query)
+    const banners = await Banner.find({ status: 'active' })
       .sort({ position: 1, createdAt: -1 })
       .select('-status -createdBy -updatedBy -__v')
       .lean();
 
-    // Transform data for frontend
+    // Transform data for frontend - device के आधार पर सही इमेज भेजें
     const transformedBanners = banners.map(banner => ({
       id: banner._id,
-      image: banner.image.url,
+      // device के आधार पर सही इमेज सेलेक्ट करें
+      image: device === 'mobile' ? banner.mobileImage.url : banner.desktopImage.url,
+      // दोनों इमेज भी भेजें ताकि फ्रंटएंड पर रिस्पॉन्सिव बना सकें
+      desktopImage: banner.desktopImage.url,
+      mobileImage: banner.mobileImage.url,
       title: banner.title,
       subtitle: banner.subtitle,
       cta: banner.ctaText,
@@ -126,6 +157,81 @@ exports.getBanner = async (req, res, next) => {
 };
 
 // Create new banner
+// exports.createBanner = async (req, res, next) => {
+//   try {
+//     // Validate required fields
+//     const { title } = req.body;
+//     if (!title) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Banner title is required'
+//       });
+//     }
+
+//     // Handle image upload
+//     let imageData = {};
+//     if (req.files && req.files.image) {
+//       const imageFile = req.files.image[0];
+//       imageData = {
+//         url: imageFile.fullUrl,
+//         public_id: imageFile.filename,
+//         folder: imageFile.folder
+//       };
+//     } else if (req.body.image) {
+//       // If image URL provided directly (for external images)
+//       if (typeof req.body.image === 'string') {
+//         imageData = {
+//           url: req.body.image,
+//           public_id: `external-${Date.now()}`,
+//           folder: 'external'
+//         };
+//       } else if (typeof req.body.image === 'object') {
+//         imageData = req.body.image;
+//       }
+//     } else {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Banner image is required'
+//       });
+//     }
+
+//     // Prepare banner data
+//     const bannerData = {
+//       title,
+//       subtitle: req.body.subtitle || '',
+//       image: imageData,
+//       ctaText: req.body.ctaText || 'Shop Now',
+//       ctaLink: req.body.ctaLink || '/products',
+//       status: req.body.status || 'active',
+//       position: parseInt(req.body.position) || 0,
+//       targetUrl: req.body.targetUrl || '',
+//       deviceType: req.body.deviceType || 'all',
+//       isFeatured: req.body.isFeatured === 'true' || req.body.isFeatured === true,
+//       createdBy: req.user.id
+//     };
+
+//     // Create banner
+//     const banner = await Banner.create(bannerData);
+
+//     res.status(201).json({
+//       success: true,
+//       message: 'Banner created successfully',
+//       data: banner
+//     });
+//   } catch (error) {
+//     console.error('❌ Error creating banner:', error);
+    
+//     if (error.name === 'ValidationError') {
+//       const messages = Object.values(error.errors).map(val => val.message);
+//       return res.status(400).json({
+//         success: false,
+//         message: messages.join(', ')
+//       });
+//     }
+    
+//     next(error);
+//   }
+// };
 exports.createBanner = async (req, res, next) => {
   try {
     // Validate required fields
@@ -137,30 +243,57 @@ exports.createBanner = async (req, res, next) => {
       });
     }
 
-    // Handle image upload
-    let imageData = {};
-    if (req.files && req.files.image) {
-      const imageFile = req.files.image[0];
-      imageData = {
+    // Handle images upload
+    let desktopImageData = {};
+    let mobileImageData = {};
+
+    // Desktop image handle
+    if (req.files && req.files.desktopImage) {
+      const imageFile = req.files.desktopImage[0];
+      desktopImageData = {
         url: imageFile.fullUrl,
         public_id: imageFile.filename,
-        folder: imageFile.folder
+        folder: imageFile.folder || 'banners/desktop'
       };
-    } else if (req.body.image) {
-      // If image URL provided directly (for external images)
-      if (typeof req.body.image === 'string') {
-        imageData = {
-          url: req.body.image,
-          public_id: `external-${Date.now()}`,
-          folder: 'external'
+    } else if (req.body.desktopImage) {
+      if (typeof req.body.desktopImage === 'string') {
+        desktopImageData = {
+          url: req.body.desktopImage,
+          public_id: `desktop-${Date.now()}`,
+          folder: 'external/desktop'
         };
-      } else if (typeof req.body.image === 'object') {
-        imageData = req.body.image;
+      } else if (typeof req.body.desktopImage === 'object') {
+        desktopImageData = req.body.desktopImage;
       }
     } else {
       return res.status(400).json({
         success: false,
-        message: 'Banner image is required'
+        message: 'Desktop banner image is required'
+      });
+    }
+
+    // Mobile image handle
+    if (req.files && req.files.mobileImage) {
+      const imageFile = req.files.mobileImage[0];
+      mobileImageData = {
+        url: imageFile.fullUrl,
+        public_id: imageFile.filename,
+        folder: imageFile.folder || 'banners/mobile'
+      };
+    } else if (req.body.mobileImage) {
+      if (typeof req.body.mobileImage === 'string') {
+        mobileImageData = {
+          url: req.body.mobileImage,
+          public_id: `mobile-${Date.now()}`,
+          folder: 'external/mobile'
+        };
+      } else if (typeof req.body.mobileImage === 'object') {
+        mobileImageData = req.body.mobileImage;
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Mobile banner image is required'
       });
     }
 
@@ -168,13 +301,13 @@ exports.createBanner = async (req, res, next) => {
     const bannerData = {
       title,
       subtitle: req.body.subtitle || '',
-      image: imageData,
+      desktopImage: desktopImageData,
+      mobileImage: mobileImageData,
       ctaText: req.body.ctaText || 'Shop Now',
       ctaLink: req.body.ctaLink || '/products',
       status: req.body.status || 'active',
       position: parseInt(req.body.position) || 0,
       targetUrl: req.body.targetUrl || '',
-      deviceType: req.body.deviceType || 'all',
       isFeatured: req.body.isFeatured === 'true' || req.body.isFeatured === true,
       createdBy: req.user.id
     };
@@ -203,9 +336,74 @@ exports.createBanner = async (req, res, next) => {
 };
 
 // Update banner
+// exports.updateBanner = async (req, res, next) => {
+//   try {
+
+//     let banner = await Banner.findById(req.params.id);
+
+//     if (!banner) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Banner not found'
+//       });
+//     }
+
+//     // Handle image update
+//     if (req.files && req.files.image) {
+//       const imageFile = req.files.image[0];
+//       req.body.image = {
+//         url: imageFile.fullUrl,
+//         public_id: imageFile.filename,
+//         folder: imageFile.folder
+//       };
+//     }
+
+//     // Prepare update data
+//     const updateData = { ...req.body };
+    
+//     // Handle boolean fields
+//     if (req.body.isFeatured !== undefined) {
+//       updateData.isFeatured = req.body.isFeatured === 'true' || req.body.isFeatured === true;
+//     }
+    
+//     // Handle numeric fields
+//     if (req.body.position !== undefined) {
+//       updateData.position = parseInt(req.body.position);
+//     }
+
+//     // Add updatedBy
+//     updateData.updatedBy = req.user.id;
+
+//     // Remove empty fields
+//     Object.keys(updateData).forEach(key => {
+//       if (updateData[key] === '' || updateData[key] === null || updateData[key] === undefined) {
+//         delete updateData[key];
+//       }
+//     });
+
+//     // Update banner
+//     banner = await Banner.findByIdAndUpdate(
+//       req.params.id,
+//       updateData,
+//       {
+//         new: true,
+//         runValidators: true
+//       }
+//     ).populate('createdBy', 'name email')
+//      .populate('updatedBy', 'name email');
+
+//     res.status(200).json({
+//       success: true,
+//       message: 'Banner updated successfully',
+//       data: banner
+//     });
+//   } catch (error) {
+//     console.error('❌ Error updating banner:', error);
+//     next(error);
+//   }
+// };
 exports.updateBanner = async (req, res, next) => {
   try {
-
     let banner = await Banner.findById(req.params.id);
 
     if (!banner) {
@@ -215,13 +413,22 @@ exports.updateBanner = async (req, res, next) => {
       });
     }
 
-    // Handle image update
-    if (req.files && req.files.image) {
-      const imageFile = req.files.image[0];
-      req.body.image = {
+    // Handle images update
+    if (req.files && req.files.desktopImage) {
+      const imageFile = req.files.desktopImage[0];
+      req.body.desktopImage = {
         url: imageFile.fullUrl,
         public_id: imageFile.filename,
-        folder: imageFile.folder
+        folder: imageFile.folder || 'banners/desktop'
+      };
+    }
+
+    if (req.files && req.files.mobileImage) {
+      const imageFile = req.files.mobileImage[0];
+      req.body.mobileImage = {
+        url: imageFile.fullUrl,
+        public_id: imageFile.filename,
+        folder: imageFile.folder || 'banners/mobile'
       };
     }
 
@@ -300,36 +507,6 @@ exports.deleteBanner = async (req, res, next) => {
 };
 
 // Upload banner image
-// exports.uploadBannerImage = async (req, res, next) => {
-//   try {
-
-//     if (!req.files || !req.files.image) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Please upload an image file'
-//       });   
-//     }
-
-//     const imageFile = req.files.image[0];
-
-//     res.status(200).json({
-//       success: true,
-//       message: 'Image uploaded successfully',
-//       data: {
-//         image: {
-//           url: imageFile.fullUrl,
-//           public_id: imageFile.filename,
-//           folder: imageFile.folder,
-//           size: imageFile.size,
-//           mimetype: imageFile.mimetype
-//         }
-//       }
-//     });
-//   } catch (error) {
-//     console.error('❌ Error uploading image:', error);
-//     next(error);
-//   }
-// };
 exports.uploadBannerImage = async (req, res, next) => {
   try {
     if (!req.files || !req.files.image) {

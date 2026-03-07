@@ -179,7 +179,7 @@ exports.googleAuth = async (req, res) => {
       try {
         const { tokens } = await client.getToken({
           code,
-          redirect_uri: redirectUri || `${process.env.FRONTEND_URL || 'http://localhost:5174'}/auth/google/callback`
+          redirect_uri: redirectUri || `${process.env.FRONTEND_URL}/auth/google/callback`
         });
         
         const ticket = await client.verifyIdToken({
