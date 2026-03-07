@@ -332,3 +332,67 @@ exports.clearCart = async (req, res) => {
   }
 };
 
+// ✅ Bulk sync cart items
+exports.syncCart = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { items } = req.body; // Array of { productId, variationId, quantity }
+
+    if (!items || !Array.isArray(items)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Items array is required'
+      });
+    }
+
+    let cart = await Cart.findOne({ userId });
+
+    if (!cart) {
+      cart = new Cart({ userId, items: [] });
+    }
+
+    // Merge local items with existing cart
+    for (const localItem of items) {
+      // Validate required fields
+      if (!localItem.productId || !localItem.variationId || !localItem.quantity) {
+        console.warn('Skipping invalid item:', localItem);
+        continue;
+      }
+
+      const existingItemIndex = cart.items.findIndex(
+        item => item.productId.toString() === localItem.productId && 
+                item.variationId.toString() === localItem.variationId
+      );
+
+      if (existingItemIndex > -1) {
+        // Update quantity (add local quantity to existing)
+        cart.items[existingItemIndex].quantity += localItem.quantity;
+      } else {
+        // Add new item
+        cart.items.push({
+          productId: localItem.productId,
+          variationId: localItem.variationId,
+          quantity: localItem.quantity
+        });
+      }
+    }
+
+    await cart.save();
+    
+    // Populate product details for response
+    await cart.populate('items.productId');
+    
+    res.status(200).json({
+      success: true,
+      message: 'Cart synced successfully',
+      data: cart
+    });
+  } catch (error) {
+    console.error('Sync cart error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: error.message
+    });
+  }
+};

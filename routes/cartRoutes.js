@@ -8,5 +8,6 @@ router.get('/', authMiddleware, categoryController.getCartItems);
 router.put('/update/:productId/:variationId', authMiddleware, categoryController.updateItemQuantity);
 router.delete('/remove/:productId/:variationId', authMiddleware, categoryController.removeItemFromCart);
 router.delete('/clear', authMiddleware, categoryController.clearCart);
+router.post('/cart/sync', authMiddleware, categoryController.syncCart);
 
 module.exports = router;
