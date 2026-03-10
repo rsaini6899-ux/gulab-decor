@@ -1,7 +1,7 @@
 const Product = require('../models/Product');
 const Category = require('../models/Category');
 const APIFeatures = require('../utils/APIFeatures');
-const getFullImageUrl = require('../utils/getFullImageUrl');
+const getFullImageUrl = require('../utils/getFullImageUrl')
 
 const validateVariations = (variations) => {
   if (!variations || !Array.isArray(variations)) return true;
@@ -82,12 +82,10 @@ exports.getLeastProducts = async (req, res, next) => {
       
       const mainVariation = variationsWithImages.find(v => v.isMain === true) || variationsWithImages[0];
       
-      // ✅ Display image सेट करें
       let displayImage = null;
       if (mainVariation?.images && mainVariation.images.length > 0) {
         const mainImage = mainVariation.images.find(img => img.isMain === true);
         if (mainImage && mainImage.url) {
-          // सीधे URL return करें, getFullImageUrl function का use न करें
           displayImage = mainImage.url;
           console.log(`Found main image with URL:`, mainImage.url);
         } else {
@@ -111,7 +109,6 @@ exports.getLeastProducts = async (req, res, next) => {
         attributes: mainVariation.attributes || []
       } : null;
       
-      // यहाँ ध्यान दें - displayImage को सीधे return कर रहे हैं
       return {
         _id: productObj._id,
         name: productObj.name,
@@ -126,7 +123,7 @@ exports.getLeastProducts = async (req, res, next) => {
         bestseller: productObj.bestseller,
         createdAt: productObj.createdAt,
         
-        // ✅ Display image - सीधे URL
+        // ✅ Display image 
         displayImage: displayImage,
         
         // ✅ Main variation
