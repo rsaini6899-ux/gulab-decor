@@ -136,8 +136,6 @@ exports.getPoliciesByType = async (req, res, next) => {
   }
 };
 
-
-
 // Create new policy
 exports.createPolicy = async (req, res, next) => {
   try {
