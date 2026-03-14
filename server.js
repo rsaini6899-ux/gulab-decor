@@ -10,6 +10,7 @@ const rateLimit = require('express-rate-limit');
 // Load environment variables
 dotenv.config();
 
+
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const productRoutes = require('./routes/productRoutes');
@@ -20,6 +21,7 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const couponRoutes = require('./routes/couponRoutes');
 const policyRoutes = require('./routes/policyRoutes');
+const faqRoutes = require('./routes/faqRoutes');
 const bannerRoutes = require('./routes/bannerRoutes');
 const blogRoutes = require('./routes/blogRoutes');
 const cartRoutes = require('./routes/cartRoutes');
@@ -80,6 +82,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/policies', policyRoutes);
+app.use('/api/faqs', faqRoutes);
 app.use('/api/banners', bannerRoutes);
 app.use('/api/blogs', blogRoutes);
 app.use('/api/cart', cartRoutes);

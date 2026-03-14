@@ -71,20 +71,31 @@ exports.createBlog = async (req, res, next) => {
     }
 
     // Handle image upload
-    let imageData = {};
-    if (req.files && req.files.image) {      const imageFile = req.files.image[0];
+    // let imageData = {};
+    // if (req.files && req.files.image) {      const imageFile = req.files.image[0];
       
-      // ✅ URL generate karo sahi tarike se
-      const filePath = imageFile.path || imageFile.filename || `uploads/blogs/${imageFile.filename}`;
-      const imageUrl = getFullImageUrl(req, filePath);
+    //   // ✅ URL generate karo sahi tarike se
+    //   const filePath = imageFile.path || imageFile.filename || `uploads/blogs/${imageFile.filename}`;
+    //   const imageUrl = getFullImageUrl(req, filePath);
       
+    //   imageData = {
+    //     url: imageUrl,  // ✅ GENERATED URL
+    //     public_id: imageFile.filename,
+    //     folder: imageFile.folder || 'blogs'
+    //   };
+      
+    //   console.log('Blog Create - Generated Image URL:', imageUrl); // Debug
+       let imageData = {};
+    if (req.files && req.files.image) {
+      const imageFile = req.files.image[0];
+      
+      // ✅ CLOUDINARY URL DIRECTLY USE KARO
       imageData = {
-        url: imageUrl,  // ✅ GENERATED URL
+        url: imageFile.fullUrl,  // ✅ Cloudinary se already full URL mil gaya
         public_id: imageFile.filename,
-        folder: imageFile.folder || 'blogs'
+        folder: 'blogs'
       };
-      
-      console.log('Blog Create - Generated Image URL:', imageUrl); // Debug
+    
       
     } else if (req.body.image) {
       // If image URL provided directly
@@ -382,58 +393,49 @@ exports.deleteBlog = async (req, res, next) => {
 //     }
 
 //     const imageFile = req.files.image[0];
+    
+//     // ✅ URL generate karo proper tarike se
+//     const filePath = imageFile.path || imageFile.filename || `uploads/blogs/${imageFile.filename}`;
+//     const imageUrl = getFullImageUrl(req, filePath);
+    
+//     // Debug (optional - production mein hata sakte ho)
+//     console.log('Blog Image Upload - Generated URL:', imageUrl);
 
 //     res.status(200).json({
 //       success: true,
 //       message: 'Image uploaded successfully',
 //       data: {
 //         image: {
-//           url: imageFile.fullUrl,
+//           url: imageUrl,  // ✅ YEH USE KARO, imageFile.fullUrl nahi
 //           public_id: imageFile.filename,
-//           folder: imageFile.folder,
+//           folder: imageFile.folder || 'blogs',
 //           size: imageFile.size,
 //           mimetype: imageFile.mimetype
 //         }
 //       }
 //     });
 //   } catch (error) {
-//     console.error('❌ Error uploading image:', error);
+//     console.error('❌ Error uploading blog image:', error);
 //     next(error);
 //   }
 // };
 exports.uploadBlogImage = async (req, res, next) => {
   try {
-    if (!req.files || !req.files.image) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please upload an image file'
-      });   
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
-
-    const imageFile = req.files.image[0];
     
-    // ✅ URL generate karo proper tarike se
-    const filePath = imageFile.path || imageFile.filename || `uploads/blogs/${imageFile.filename}`;
-    const imageUrl = getFullImageUrl(req, filePath);
-    
-    // Debug (optional - production mein hata sakte ho)
-    console.log('Blog Image Upload - Generated URL:', imageUrl);
-
+    // ✅ DIRECT CLOUDINARY URL BHEJO
     res.status(200).json({
       success: true,
       message: 'Image uploaded successfully',
       data: {
-        image: {
-          url: imageUrl,  // ✅ YEH USE KARO, imageFile.fullUrl nahi
-          public_id: imageFile.filename,
-          folder: imageFile.folder || 'blogs',
-          size: imageFile.size,
-          mimetype: imageFile.mimetype
-        }
+        url: req.file.fullUrl,  // ✅ YEH PERMANENT URL HAI
+        public_id: req.file.filename,
+        folder: 'blogs'
       }
     });
   } catch (error) {
-    console.error('❌ Error uploading blog image:', error);
     next(error);
   }
 };

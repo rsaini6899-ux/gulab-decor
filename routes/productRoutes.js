@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const productController = require('../controllers/productController');
 const authMiddleware = require('../middleware/auth');
-const upload = require('../middleware/upload');
+// const upload = require('../middleware/upload');
+const { cloudinaryUpload, processCloudinaryResponse } = require('../middleware/upload');
 
 // Public routes
 router.get('/featured-bestseller', productController.getFeaturedAndBestsellerProducts);
@@ -13,8 +14,10 @@ router.get('/:id', productController.getProductById);
 
 // Upload routes
 router.post('/upload-images', 
-  upload.array('images', 10),
-  upload.processImage('products'),
+  // upload.array('images', 10),
+  cloudinaryUpload('products').array('images', 10),
+  // upload.processImage('products'),
+  processCloudinaryResponse,
   productController.uploadProductImages
 );
 
@@ -22,15 +25,19 @@ router.post('/upload-images',
 // Protected routes (admin only)
 router.post('/', 
   authMiddleware,
-  upload.fields([{ name: 'images', maxCount: 10 }]),
-  upload.processImage('products'),
+  // upload.fields([{ name: 'images', maxCount: 10 }]),
+  cloudinaryUpload('products').fields([{ name: 'images', maxCount: 10 }]),
+  // upload.processImage('products'),
+  processCloudinaryResponse,
   productController.createProduct
 );
 
 router.put('/:id', 
   authMiddleware,
-  upload.fields([{ name: 'images', maxCount: 10 }]),
-  upload.processImage('products'),
+  // upload.fields([{ name: 'images', maxCount: 10 }]),
+  cloudinaryUpload('products').fields([{ name: 'images', maxCount: 10 }]),
+  // upload.processImage('products'),
+  processCloudinaryResponse,
   productController.updateProduct
 );
 
@@ -57,8 +64,9 @@ router.delete('/:id/variations/:variationId', authMiddleware, productController.
 // ✅ Variation Images Management
 router.post('/:id/variations/:variationId/images',
   authMiddleware,
-  upload.array('images', 10),
-  upload.processImage('variations'),
+  cloudinaryUpload('products').array('images', 10),
+  // upload.processImage('variations'),
+  processCloudinaryResponse,
   productController.addImagesToVariation
 );
 

@@ -12,17 +12,23 @@ const getFullImageUrl = require('../utils/getFullImageUrl');
 //       });
 //     }
     
-//     // ✅ Now req.file will have fullUrl and folder properties
-//     const imageUrl = req.file.fullUrl;
-//     const folder = req.file.folder;
+//     // ❌ YEH GALAT HAI - req.file.fullUrl par rely mat karo
+//     // const imageUrl = req.file.fullUrl;
+    
+//     // ✅ YEH SAHI HAI - URL abhi generate karo
+//     const filePath = req.file.path || req.file.filename || `uploads/categories/${req.file.filename}`;
+//     const imageUrl = getFullImageUrl(req, filePath);
+    
+//     // Debug (optional)
+//     console.log('Category Image Upload - Generated URL:', imageUrl);
     
 //     res.status(200).json({
 //       success: true,
 //       message: 'Image uploaded successfully',
 //       data: {
-//         url: imageUrl,
+//         url: imageUrl,  // ✅ GENERATED URL
 //         path: req.file.path,
-//         folder: folder,
+//         folder: req.file.folder || 'categories',
 //         filename: req.file.filename,
 //         size: req.file.size,
 //         mimetype: req.file.mimetype
@@ -37,7 +43,6 @@ const getFullImageUrl = require('../utils/getFullImageUrl');
 //     });
 //   }
 // };
-
 exports.uploadCategoryImage = async (req, res, next) => {
   try {
     
@@ -48,26 +53,17 @@ exports.uploadCategoryImage = async (req, res, next) => {
       });
     }
     
-    // ❌ YEH GALAT HAI - req.file.fullUrl par rely mat karo
-    // const imageUrl = req.file.fullUrl;
+    // ✅ SIRF URL BHEJO - String format mein
+    const imageUrl = req.file.fullUrl || getFullImageUrl(req, req.file.path);
     
-    // ✅ YEH SAHI HAI - URL abhi generate karo
-    const filePath = req.file.path || req.file.filename || `uploads/categories/${req.file.filename}`;
-    const imageUrl = getFullImageUrl(req, filePath);
-    
-    // Debug (optional)
-    console.log('Category Image Upload - Generated URL:', imageUrl);
+    console.log('Category Image Upload - URL:', imageUrl);
     
     res.status(200).json({
       success: true,
       message: 'Image uploaded successfully',
       data: {
-        url: imageUrl,  // ✅ GENERATED URL
-        path: req.file.path,
-        folder: req.file.folder || 'categories',
-        filename: req.file.filename,
-        size: req.file.size,
-        mimetype: req.file.mimetype
+        url: imageUrl,  // ✅ SIRF URL STRING
+        // Extra fields hata diye agar schema string expect karta hai
       }
     });
     
@@ -79,7 +75,6 @@ exports.uploadCategoryImage = async (req, res, next) => {
     });
   }
 };
-
 
 exports.getAllCategories = async (req, res, next) => {
   try {
@@ -662,10 +657,144 @@ exports.deleteCategory = async (req, res, next) => {
 };
 
 // Update category
+// exports.updateCategory = async (req, res, next) => {
+//   try {
+//     const categoryId = req.params.id;
+//     const updateData = req.body;
+    
+//     let category = await Category.findById(categoryId);
+    
+//     if (!category) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Category not found'
+//       });
+//     }
+    
+//     // Handle image
+//     if (req.file) {
+//       updateData.image = getFullImageUrl(req, req.file.path);
+//     } else if (req.body.imageUrl) {
+//       updateData.image = req.body.imageUrl;
+//       delete req.body.imageUrl;
+//     }
+    
+//     // ✅ FIXED: Check duplicate name only under same parent
+//     if (updateData.name && updateData.name !== category.name) {
+//       const existingCategory = await Category.findOne({ 
+//         name: updateData.name,
+//         parent: category.parent, // Same parent ke under check karo
+//         _id: { $ne: categoryId }
+//       });
+      
+//       if (existingCategory) {
+//         return res.status(400).json({
+//           success: false,
+//           message: `Category "${updateData.name}" already exists under this parent`
+//         });
+//       }
+//     }
+    
+//     // Update basic fields
+//     const basicFields = ['name', 'slug', 'description', 'status', 'featured', 'image'];
+//     basicFields.forEach(field => {
+//       if (updateData[field] !== undefined) {
+//         category[field] = updateData[field];
+//       }
+//     });
+    
+//     await category.save();
+    
+//     // ✅ Process children with proper duplicate handling
+//     if (updateData.children && Array.isArray(updateData.children)) {
+      
+//       const updateChildren = async (parentId, children, level = 1) => {
+//         const results = [];
+        
+//         for (const childData of children) {
+          
+//           // Check if child already exists under this parent
+//           let childCategory = await Category.findOne({
+//             name: childData.name,
+//             parent: parentId
+//           });
+          
+//           if (childCategory) {
+//             // ✅ UPDATE EXISTING CHILD
+//             childCategory.name = childData.name || childCategory.name;
+//             childCategory.slug = childData.slug || childCategory.slug;
+//             childCategory.description = childData.description || childCategory.description;
+//             childCategory.status = childData.status || childCategory.status;
+//             childCategory.featured = childData.featured || childCategory.featured;
+            
+//             if (childData.imageUrl) {
+//               childCategory.image = childData.imageUrl;
+//             }
+            
+//             await childCategory.save();
+            
+//           } else {
+//             // ✅ CREATE NEW CHILD
+//             childCategory = await Category.create({
+//               name: childData.name,
+//               slug: childData.slug,
+//               description: childData.description || '',
+//               status: childData.status || 'active',
+//               featured: childData.featured || false,
+//               image: childData.imageUrl || '',
+//               parent: parentId,
+//               level: level
+//             });
+//           }
+          
+//           // Process grandchildren
+//           if (childData.children && childData.children.length > 0) {
+//             await updateChildren(childCategory._id, childData.children, level + 1);
+//           }
+          
+//           results.push(childCategory);
+//         }
+        
+//         return results;
+//       };
+      
+//       await updateChildren(category._id, updateData.children, 1);
+//     }
+    
+//     // Get updated category with children
+//     const updatedCategory = await Category.findById(categoryId)
+//       .populate({
+//         path: 'children',
+//         populate: { path: 'children' }
+//       });
+    
+//     res.status(200).json({
+//       success: true,
+//       message: 'Category updated successfully',
+//       data: updatedCategory
+//     });
+    
+//   } catch (error) {
+//     console.error('❌ Error:', error);
+    
+//     // Handle duplicate key error
+//     if (error.code === 11000) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Category with same name already exists under this parent'
+//       });
+//     }
+    
+//     res.status(500).json({
+//       success: false,
+//       message: error.message || 'Server error'
+//     });
+//   }
+// };
 exports.updateCategory = async (req, res, next) => {
   try {
     const categoryId = req.params.id;
-    const updateData = req.body;
+    const updateData = { ...req.body }; // Clone karo
     
     let category = await Category.findById(categoryId);
     
@@ -676,19 +805,33 @@ exports.updateCategory = async (req, res, next) => {
       });
     }
     
-    // Handle image
+    // ✅ Handle image - STRING store karo
     if (req.file) {
-      updateData.image = getFullImageUrl(req, req.file.path);
+      // Agar file upload hui hai to URL store karo
+      updateData.image = req.file.fullUrl || getFullImageUrl(req, req.file.path);
+      console.log('Updating with image URL:', updateData.image);
     } else if (req.body.imageUrl) {
+      // Agar imageUrl directly aaya hai to use karo
       updateData.image = req.body.imageUrl;
-      delete req.body.imageUrl;
+    } else if (req.body.image) {
+      // Agar image object aaya hai to sirf URL lo
+      if (typeof req.body.image === 'object') {
+        updateData.image = req.body.image.url || req.body.image;
+      }
     }
     
-    // ✅ FIXED: Check duplicate name only under same parent
+    // Clean updateData - remove undefined fields
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined || updateData[key] === null) {
+        delete updateData[key];
+      }
+    });
+    
+    // ✅ Check duplicate name
     if (updateData.name && updateData.name !== category.name) {
       const existingCategory = await Category.findOne({ 
         name: updateData.name,
-        parent: category.parent, // Same parent ke under check karo
+        parent: category.parent,
         _id: { $ne: categoryId }
       });
       
@@ -700,7 +843,7 @@ exports.updateCategory = async (req, res, next) => {
       }
     }
     
-    // Update basic fields
+    // ✅ Update fields - SIRF BASIC FIELDS
     const basicFields = ['name', 'slug', 'description', 'status', 'featured', 'image'];
     basicFields.forEach(field => {
       if (updateData[field] !== undefined) {
@@ -710,79 +853,15 @@ exports.updateCategory = async (req, res, next) => {
     
     await category.save();
     
-    // ✅ Process children with proper duplicate handling
-    if (updateData.children && Array.isArray(updateData.children)) {
-      
-      const updateChildren = async (parentId, children, level = 1) => {
-        const results = [];
-        
-        for (const childData of children) {
-          
-          // Check if child already exists under this parent
-          let childCategory = await Category.findOne({
-            name: childData.name,
-            parent: parentId
-          });
-          
-          if (childCategory) {
-            // ✅ UPDATE EXISTING CHILD
-            childCategory.name = childData.name || childCategory.name;
-            childCategory.slug = childData.slug || childCategory.slug;
-            childCategory.description = childData.description || childCategory.description;
-            childCategory.status = childData.status || childCategory.status;
-            childCategory.featured = childData.featured || childCategory.featured;
-            
-            if (childData.imageUrl) {
-              childCategory.image = childData.imageUrl;
-            }
-            
-            await childCategory.save();
-            
-          } else {
-            // ✅ CREATE NEW CHILD
-            childCategory = await Category.create({
-              name: childData.name,
-              slug: childData.slug,
-              description: childData.description || '',
-              status: childData.status || 'active',
-              featured: childData.featured || false,
-              image: childData.imageUrl || '',
-              parent: parentId,
-              level: level
-            });
-          }
-          
-          // Process grandchildren
-          if (childData.children && childData.children.length > 0) {
-            await updateChildren(childCategory._id, childData.children, level + 1);
-          }
-          
-          results.push(childCategory);
-        }
-        
-        return results;
-      };
-      
-      await updateChildren(category._id, updateData.children, 1);
-    }
-    
-    // Get updated category with children
-    const updatedCategory = await Category.findById(categoryId)
-      .populate({
-        path: 'children',
-        populate: { path: 'children' }
-      });
-    
     res.status(200).json({
       success: true,
       message: 'Category updated successfully',
-      data: updatedCategory
+      data: category
     });
     
   } catch (error) {
     console.error('❌ Error:', error);
     
-    // Handle duplicate key error
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,

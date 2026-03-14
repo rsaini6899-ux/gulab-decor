@@ -2,7 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const categoryController = require('../controllers/categoryController');
-const upload = require('../middleware/upload');
+const { cloudinaryUpload, processCloudinaryResponse } = require('../middleware/upload');
+// const upload = require('../middleware/upload');
 
 // const authMiddleware = require('../middleware/auth');
 // router.use(authMiddleware);
@@ -12,8 +13,10 @@ router.put('/:id/attribute-templates', categoryController.updateAttributeTemplat
 router.put('/update-variation-values', categoryController.updateVariationTypeValues);
 
 router.post('/upload-image', 
-  upload.single('image'),
-  upload.processImage('categories'), 
+  // upload.single('image'),
+  cloudinaryUpload('categories').single('image'),
+  // upload.processImage('categories'), 
+  processCloudinaryResponse,
   categoryController.uploadCategoryImage
 );
 
@@ -38,8 +41,10 @@ router.get('/hierarchy/all', categoryController.getCategoriesHierarchy);
 
 
 router.put('/:id',
-  upload.single('image'),
-  upload.processImage('categories'),
+  // upload.single('image'),
+  cloudinaryUpload('categories').single('image'),
+  // upload.processImage('categories'),
+  processCloudinaryResponse,
   categoryController.updateCategory
 );
 
