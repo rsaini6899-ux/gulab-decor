@@ -807,43 +807,17 @@ exports.updateCategory = async (req, res, next) => {
     
     // ✅ Handle image - STRING store karo
     if (req.file) {
-      // Agar file upload hui hai to URL store karo
       updateData.image = req.file.fullUrl || getFullImageUrl(req, req.file.path);
       console.log('Updating with image URL:', updateData.image);
     } else if (req.body.imageUrl) {
-      // Agar imageUrl directly aaya hai to use karo
       updateData.image = req.body.imageUrl;
     } else if (req.body.image) {
-      // Agar image object aaya hai to sirf URL lo
       if (typeof req.body.image === 'object') {
         updateData.image = req.body.image.url || req.body.image;
       }
     }
     
-    // Clean updateData - remove undefined fields
-    Object.keys(updateData).forEach(key => {
-      if (updateData[key] === undefined || updateData[key] === null) {
-        delete updateData[key];
-      }
-    });
-    
-    // ✅ Check duplicate name
-    if (updateData.name && updateData.name !== category.name) {
-      const existingCategory = await Category.findOne({ 
-        name: updateData.name,
-        parent: category.parent,
-        _id: { $ne: categoryId }
-      });
-      
-      if (existingCategory) {
-        return res.status(400).json({
-          success: false,
-          message: `Category "${updateData.name}" already exists under this parent`
-        });
-      }
-    }
-    
-    // ✅ Update fields - SIRF BASIC FIELDS
+    // ✅ Update basic fields
     const basicFields = ['name', 'slug', 'description', 'status', 'featured', 'image'];
     basicFields.forEach(field => {
       if (updateData[field] !== undefined) {
@@ -851,12 +825,97 @@ exports.updateCategory = async (req, res, next) => {
       }
     });
     
+    // ✅ **IMPORTANT: Handle children categories (subCategories)**
+    if (updateData.children && Array.isArray(updateData.children)) {
+      
+      // Recursive function to update/create children
+      const updateChildren = async (parentId, children, level = 1) => {
+        const updatedChildrenIds = [];
+        
+        for (const childData of children) {
+          // Check if child already exists (has _id)
+          if (childData._id) {
+            // ✅ UPDATE EXISTING CHILD
+            let childCategory = await Category.findById(childData._id);
+            
+            if (childCategory) {
+              // Update child fields
+              childCategory.name = childData.name || childCategory.name;
+              childCategory.slug = childData.slug || childCategory.slug;
+              childCategory.description = childData.description || childCategory.description;
+              childCategory.status = childData.status || childCategory.status;
+              childCategory.featured = childData.featured || childCategory.featured;
+              childCategory.parent = parentId;
+              childCategory.level = level;
+              
+              // Handle child image
+              if (childData.imageUrl) {
+                childCategory.image = childData.imageUrl;
+              } else if (childData.image) {
+                childCategory.image = typeof childData.image === 'object' 
+                  ? childData.image.url 
+                  : childData.image;
+              }
+              
+              await childCategory.save();
+              updatedChildrenIds.push(childCategory._id);
+              
+              // ✅ Recursively update grandchildren
+              if (childData.children && childData.children.length > 0) {
+                await updateChildren(childCategory._id, childData.children, level + 1);
+              }
+            }
+          } else {
+            // ✅ CREATE NEW CHILD
+            const newChild = await Category.create({
+              name: childData.name,
+              slug: childData.slug || childData.name.toLowerCase()
+                .replace(/[^a-zA-Z0-9]/g, '-')
+                .replace(/-+/g, '-'),
+              description: childData.description || '',
+              status: childData.status || 'active',
+              featured: childData.featured || false,
+              image: childData.imageUrl || (typeof childData.image === 'object' 
+                ? childData.image.url 
+                : childData.image),
+              parent: parentId,
+              level: level
+            });
+            
+            updatedChildrenIds.push(newChild._id);
+            
+            // ✅ Recursively create grandchildren
+            if (childData.children && childData.children.length > 0) {
+              await updateChildren(newChild._id, childData.children, level + 1);
+            }
+          }
+        }
+        
+        // ✅ Remove children that are not in the update list
+        await Category.deleteMany({
+          parent: parentId,
+          _id: { $nin: updatedChildrenIds }
+        });
+      };
+      
+      // Start recursive update from current category
+      await updateChildren(category._id, updateData.children, 1);
+    }
+    
+    // ✅ Save main category
     await category.save();
+    
+    // ✅ Fetch updated category with all children
+    const updatedCategory = await Category.findById(categoryId)
+      .populate({
+        path: 'children',
+        populate: { path: 'children' }
+      });
     
     res.status(200).json({
       success: true,
-      message: 'Category updated successfully',
-      data: category
+      message: 'Category and all children updated successfully',
+      data: updatedCategory
     });
     
   } catch (error) {
