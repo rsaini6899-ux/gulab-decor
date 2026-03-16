@@ -8,7 +8,6 @@ exports.getAllPolicies = async (req, res, next) => {
       limit = 10,
       search,
       type,
-      isActive,
       sortBy = "createdAt",
       sortOrder = "asc",
     } = req.query;
@@ -27,11 +26,6 @@ exports.getAllPolicies = async (req, res, next) => {
     // Type filter
     if (type) {
       query.type = type;
-    }
-
-    // Active status filter
-    if (isActive !== undefined) {
-      query.isActive = isActive === "true";
     }
 
     // Pagination
@@ -64,6 +58,21 @@ exports.getAllPolicies = async (req, res, next) => {
       stats: {
         byType: typeStats,
       },
+      data: policies,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getAllActivePolicies = async (req, res, next) => {
+  try {
+    // Execute query
+    const policies = await Policy.find({ isActive: true })
+      .sort({ createdAt: -1 })
+      .select("-__v");
+
+    res.status(200).json({
       data: policies,
     });
   } catch (error) {

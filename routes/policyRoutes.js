@@ -14,6 +14,8 @@ router.get('/public/type/:type', policyController.getPoliciesByType);
 router.route('/')
   .get(policyController.getAllPolicies)
   .post(policyController.createPolicy);
+
+  router.get('/active', policyController.getAllActivePolicies);
   
 router.route('/:id')
   .get(policyController.getPolicyById)
