@@ -27,6 +27,7 @@ const blogRoutes = require('./routes/blogRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 const wishlistRoutes = require('./routes/wishlistRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const basicRoutes = require('./routes/basicRoutes');
 
 // Initialize app
 const app = express();
@@ -88,6 +89,7 @@ app.use('/api/blogs', blogRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/basic', basicRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
