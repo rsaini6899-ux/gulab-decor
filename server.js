@@ -45,7 +45,8 @@ app.use(cors({
     'http://localhost:5173',
     'http://localhost:5174',
     'https://gulabi-decore.netlify.app',
-    'https://gulabi-decore-admin.netlify.app'
+    'https://gulabi-decore-admin.netlify.app',
+    'https://delicate-chimera-0b925b.netlify.app'
   ].filter(Boolean),
   credentials: true
 }));
