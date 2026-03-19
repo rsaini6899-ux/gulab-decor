@@ -926,209 +926,6 @@ const updateCategoryVariationValues = async (categoryId, variations) => {
 };
 
 // Update product
-// exports.updateProduct = async (req, res, next) => {
-//   try {
-//     let product = await Product.findById(req.params.id);
-    
-//     if (!product) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'Product not found'
-//       });
-//     }
-
-//     // Validate variations
-//     if (!validateVariations(req.body.variations)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Color attribute can have only one value per variation'
-//       });
-//     }
-    
-//     // Handle slug updates
-//     if (req.body.name && req.body.name !== product.name) {
-//       let newSlug = req.body.name.toLowerCase()
-//         .replace(/[^a-zA-Z0-9]/g, '-')
-//         .replace(/-+/g, '-')
-//         .replace(/^-|-$/g, '');
-      
-//       let counter = 1;
-//       let originalSlug = newSlug;
-      
-//       while (await Product.findOne({ 
-//         slug: newSlug, 
-//         _id: { $ne: req.params.id }
-//       })) {
-//         newSlug = `${originalSlug}-${counter}`;
-//         counter++;
-//       }
-      
-//       req.body.slug = newSlug;
-//     }
-    
-//     // Handle manual slug
-//     if (req.body.slug && req.body.slug !== product.slug) {
-//       const existingSlug = await Product.findOne({ 
-//         slug: req.body.slug, 
-//         _id: { $ne: req.params.id }
-//       });
-      
-//       if (existingSlug) {
-//         return res.status(400).json({
-//           success: false,
-//           message: 'This slug is already taken by another product'
-//         });
-//       }
-//     }
-    
-//     if (!req.body.slug) {
-//       req.body.slug = product.slug;
-//     }
-    
-//     // Handle empty subCategory
-//     if (req.body.subCategory === '' || req.body.subCategory === null) {
-//       delete req.body.subCategory;
-//     }
-    
-//     // ✅ STEP 1: Process color images and variations
-//     if (req.body.variations && Array.isArray(req.body.variations)) {
-//       // ✅ 1A: Collect all unique color images
-//       const colorImagesMap = {};
-      
-//       req.body.variations.forEach(variation => {
-//         const colorAttr = variation.attributes?.find(attr => 
-//           attr.name.toLowerCase() === 'color'
-//         );
-        
-//         if (colorAttr && variation.images && variation.images.length > 0) {
-//           const color = colorAttr.value;
-          
-//           if (!colorImagesMap[color]) {
-//             colorImagesMap[color] = {
-//               images: [],
-//               color: color
-//             };
-//           }
-          
-//           // Add unique images for this color
-//           variation.images.forEach(img => {
-//             const exists = colorImagesMap[color].images.some(existingImg => 
-//               existingImg.url === img.url
-//             );
-            
-//             if (!exists) {
-//               colorImagesMap[color].images.push({
-//                 url: img.url,
-//                 public_id: img.public_id || undefined,
-//                 isMain: img.isMain || false,
-//                 order: img.order || 0
-//               });
-//             }
-//           });
-//         }
-//       });
-      
-//       // Convert colorImagesMap to array format
-//       const colorImagesArray = Object.values(colorImagesMap).map(colorGroup => ({
-//         color: colorGroup.color,
-//         images: colorGroup.images,
-//         updatedBy: req.user.id
-//       }));
-      
-//       // ✅ 1B: Update product's colorImages
-//       req.body.colorImages = colorImagesArray;
-      
-//       // ✅ 1C: Clean up variations (remove images and add color field)
-//       const cleanedVariations = req.body.variations.map((variation) => {
-//         // Extract color from attributes
-//         const colorAttr = variation.attributes?.find(attr => 
-//           attr.name.toLowerCase() === 'color'
-//         );
-        
-//         // Remove temporary IDs
-//         const variationCopy = { ...variation };
-//         if (variationCopy._id && typeof variationCopy._id === 'string' && variationCopy._id.startsWith('temp_')) {
-//           delete variationCopy._id;
-//         }
-        
-//         // Ensure all required fields have defaults
-//         return {
-//           sku: variationCopy.sku || `VAR-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-//           price: variationCopy.price || 0,
-//           comparePrice: variationCopy.comparePrice || undefined,
-//           cost: variationCopy.cost || undefined,
-//           stock: variationCopy.stock || 0,
-//           attributes: variationCopy.attributes || [],
-//           color: colorAttr?.value, // ✅ Add color field
-//           status: variationCopy.status || 'active',
-//           // ❌ DON'T include images array here
-//           isMain: variationCopy.isMain || false,
-//           isGroupMain: variationCopy.isGroupMain || false,
-//           isProductMainColor: variationCopy.isProductMainColor || false
-//         };
-//       });
-      
-//       req.body.variations = cleanedVariations;
-//     }
-    
-//     // Remove undefined values
-//     Object.keys(req.body).forEach(key => {
-//       if (req.body[key] === undefined || req.body[key] === '') {
-//         delete req.body[key];
-//       }
-//     });
-
-    
-//     // ✅ Use findByIdAndUpdate with $set
-//     product = await Product.findByIdAndUpdate(
-//       req.params.id,
-//       { $set: req.body },
-//       { new: true, runValidators: true }
-//     );
-    
-//     // Update category variation values
-//     if (product.category && req.body.variations && req.body.variations.length > 0) {
-//       await updateCategoryVariationValues(product.category, req.body.variations);
-//     }
-    
-//     // ✅ Get updated product with virtual field
-//     const updatedProduct = await Product.findById(req.params.id);
-    
-//     res.status(200).json({
-//       success: true,
-//       message: 'Product updated successfully',
-//       data: {
-//         ...updatedProduct.toObject(),
-//         variations: updatedProduct.variationsWithImages
-//       }
-//     });
-//   } catch (error) {
-//     console.error('❌ Error updating product:', error);
-//     console.error('❌ Error details:', error.message);
-    
-//     if (error.name === 'ValidationError') {
-//       const messages = Object.values(error.errors).map(val => val.message);
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Validation Error',
-//         errors: messages
-//       });
-//     }
-    
-//     if (error.code === 11000) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Duplicate value. Slug or SKU already exists.'
-//       });
-//     }
-    
-//     res.status(500).json({
-//       success: false,
-//       message: 'Failed to update product',
-//       error: process.env.NODE_ENV === 'development' ? error.message : undefined
-//     });
-//   }
-// };
 exports.updateProduct = async (req, res, next) => {
   try {
     let product = await Product.findById(req.params.id);
@@ -1470,51 +1267,749 @@ exports.updateStock = async (req, res, next) => {
 };
 
 // Search products
+// exports.searchProducts = async (req, res, next) => {
+//   try {
+//     const { q, category, status, minPrice, maxPrice, limit = 20 } = req.query;
+    
+//     if (!q || q.length < 2) {
+//       return res.status(200).json({
+//         success: true,
+//         count: 0,
+//         data: [],
+//         categories: [],
+//         brands: []
+//       });
+//     }
+    
+//     const searchRegex = new RegExp(q, 'i');
+    
+//     // 1️⃣ **Search Categories with their full path**
+//     const categories = await Category.aggregate([
+//       // Match categories that have the search term
+//       { $match: { 
+//         name: searchRegex,
+//         status: 'active'
+//       }},
+      
+//       // Lookup parent categories recursively to build path
+//       { 
+//         $graphLookup: {
+//           from: "categories",
+//           startWith: "$parent",
+//           connectFromField: "parent",
+//           connectToField: "_id",
+//           as: "ancestors",
+//           depthField: "depth",
+//           maxDepth: 10
+//         }
+//       },
+      
+//       // Add path information
+//       { 
+//         $addFields: {
+//           // Sort ancestors by depth (closest first)
+//           sortedAncestors: {
+//             $sortArray: {
+//               input: "$ancestors",
+//               sortBy: { depth: -1 }
+//             }
+//           },
+//           // Build full path array: [current, parent, grandparent, ...]
+//           fullPath: {
+//             $concatArrays: [
+//               ["$$ROOT"],
+//               "$ancestors"
+//             ]
+//           }
+//         }
+//       },
+      
+//       // Sort full path by depth (root to leaf)
+//       {
+//         $addFields: {
+//           fullPath: {
+//             $sortArray: {
+//               input: "$fullPath",
+//               sortBy: { depth: 1 }
+//             }
+//           }
+//         }
+//       },
+      
+//       // Format the response
+//       {
+//         $project: {
+//           _id: 1,
+//           name: 1,
+//           slug: 1,
+//           image: 1,
+//           level: 1,
+//           parent: 1,
+//           // Create display path: "Child -> Parent -> Grandparent"
+//           displayPath: {
+//             $reduce: {
+//               input: {
+//                 $reverseArray: "$fullPath"
+//               },
+//               initialValue: "",
+//               in: {
+//                 $concat: [
+//                   "$$value",
+//                   { $cond: [{ $eq: ["$$value", ""] }, "", " " ] },
+//                   "$$this.name"
+//                 ]
+//               }
+//             }
+//           },
+//           // Array of all names in path
+//           pathNames: {
+//             $map: {
+//               input: {
+//                 $reverseArray: "$fullPath"
+//               },
+//               as: "cat",
+//               in: "$$cat.name"
+//             }
+//           },
+//           // Array of all slugs in path
+//           pathSlugs: {
+//             $map: {
+//               input: {
+//                 $reverseArray: "$fullPath"
+//               },
+//               as: "cat",
+//               in: "$$cat.slug"
+//             }
+//           }
+//         }
+//       },
+      
+//       // Sort by name
+//       { $sort: { name: 1 } },
+      
+//       // Limit results
+//       { $limit: 5 }
+//     ]);
+
+//     console.log('Found categories with paths:', categories.map(c => ({
+//       name: c.name,
+//       path: c.displayPath,
+//       pathNames: c.pathNames
+//     })));
+
+//     // 2️⃣ **Search Brands (same as before)**
+//     const brandResults = await Product.aggregate([
+//       { $match: { 
+//         $or: [
+//           { "attributes.value": searchRegex },
+//           { "variations.attributes.value": searchRegex }
+//         ]
+//       }},
+//       { $unwind: { path: "$attributes", preserveNullAndEmptyArrays: true } },
+//       { $match: { 
+//         "attributes.name": "Brand",
+//         "attributes.value": searchRegex
+//       }},
+//       { $group: {
+//         _id: "$attributes.value",
+//         count: { $sum: 1 },
+//         productIds: { $addToSet: "$_id" }
+//       }},
+//       { $sort: { count: -1 } },
+//       { $limit: 5 }
+//     ]);
+
+//     const variationBrandResults = await Product.aggregate([
+//       { $match: { 
+//         $or: [
+//           { "attributes.value": searchRegex },
+//           { "variations.attributes.value": searchRegex }
+//         ]
+//       }},
+//       { $unwind: { path: "$variations", preserveNullAndEmptyArrays: true } },
+//       { $unwind: { path: "$variations.attributes", preserveNullAndEmptyArrays: true } },
+//       { $match: { 
+//         "variations.attributes.name": "Brand",
+//         "variations.attributes.value": searchRegex
+//       }},
+//       { $group: {
+//         _id: "$variations.attributes.value",
+//         count: { $sum: 1 },
+//         productIds: { $addToSet: "$_id" }
+//       }},
+//       { $sort: { count: -1 } },
+//       { $limit: 5 }
+//     ]);
+
+//     // Combine both brand results
+//     const brandMap = new Map();
+//     [...brandResults, ...variationBrandResults].forEach(b => {
+//       if (b._id) {
+//         if (brandMap.has(b._id)) {
+//           brandMap.get(b._id).count += b.count;
+//           brandMap.get(b._id).productIds = [...new Set([...brandMap.get(b._id).productIds, ...b.productIds])];
+//         } else {
+//           brandMap.set(b._id, {
+//             name: b._id,
+//             count: b.count,
+//             productIds: b.productIds
+//           });
+//         }
+//       }
+//     });
+
+//     const brands = Array.from(brandMap.values());
+
+//     // 3️⃣ **Search Products (same as before)**
+//     let productQuery = { status: 'active' };
+    
+//     if (q) {
+//       productQuery.$or = [
+//         { name: searchRegex },
+//         { description: searchRegex },
+//         { shortDescription: searchRegex },
+//         { sku: searchRegex },
+//         { "attributes.value": searchRegex },
+//         { "variations.attributes.value": searchRegex }
+//       ];
+//     }
+    
+//     if (category) {
+//       productQuery.category = category;
+//     }
+    
+//     if (minPrice || maxPrice) {
+//       productQuery["variations.price"] = {};
+//       if (minPrice) productQuery["variations.price"].$gte = Number(minPrice);
+//       if (maxPrice) productQuery["variations.price"].$lte = Number(maxPrice);
+//     }
+    
+//     const products = await Product.find(productQuery)
+//       .populate('category', 'name slug')
+//       .populate('subCategory', 'name slug')
+//       .limit(parseInt(limit))
+//       .select('name sku slug description shortDescription category subCategory status featured bestseller colorImages variations attributes');
+
+//     // Process products (same as before)
+//     const processedProducts = products.map(product => {
+//       const productObj = product.toObject();
+//       const variations = productObj.variations || [];
+//       const mainVariation = variations.find(v => v.isMain === true) || variations[0];
+      
+//       const colorImageMap = new Map();
+//       if (productObj.colorImages && productObj.colorImages.length > 0) {
+//         productObj.colorImages.forEach(colorImage => {
+//           if (colorImage.color && colorImage.images) {
+//             colorImageMap.set(colorImage.color, {
+//               images: colorImage.images,
+//               color: colorImage.color
+//             });
+//           }
+//         });
+//       }
+      
+//       let mainImage = null;
+//       let productColor = null;
+      
+//       if (mainVariation) {
+//         const colorAttr = mainVariation.attributes?.find(attr => 
+//           attr.name && attr.name.toLowerCase() === 'color'
+//         );
+//         productColor = colorAttr ? colorAttr.value : mainVariation.color;
+        
+//         if (productColor) {
+//           const colorImageData = colorImageMap.get(productColor);
+//           if (colorImageData && colorImageData.images && colorImageData.images.length > 0) {
+//             mainImage = colorImageData.images.find(img => img.isMain === true) || colorImageData.images[0];
+//           }
+//         }
+//       }
+      
+//       if (!mainImage && productObj.colorImages && productObj.colorImages.length > 0) {
+//         const firstColorGroup = productObj.colorImages[0];
+//         if (firstColorGroup && firstColorGroup.images && firstColorGroup.images.length > 0) {
+//           mainImage = firstColorGroup.images.find(img => img.isMain === true) || firstColorGroup.images[0];
+//         }
+//       }
+
+//       const colorsDetailed = [];
+//       colorImageMap.forEach((value, color) => {
+//         colorsDetailed.push({
+//           name: color,
+//           images: value.images,
+//           mainImage: value.images.find(img => img.isMain === true) || value.images[0]
+//         });
+//       });
+
+//       const prices = variations.map(v => v.price || 0).filter(p => p > 0);
+//       const minProductPrice = prices.length > 0 ? Math.min(...prices) : 0;
+//       const maxProductPrice = prices.length > 0 ? Math.max(...prices) : 0;
+
+//       const matchingAttributes = [];
+//       if (productObj.attributes) {
+//         productObj.attributes.forEach(attr => {
+//           if (attr.value && attr.value.toLowerCase().includes(q.toLowerCase())) {
+//             matchingAttributes.push({
+//               name: attr.name,
+//               value: attr.value,
+//               type: 'product'
+//             });
+//           }
+//         });
+//       }
+      
+//       variations.forEach(variation => {
+//         if (variation.attributes) {
+//           variation.attributes.forEach(attr => {
+//             if (attr.value && attr.value.toLowerCase().includes(q.toLowerCase())) {
+//               matchingAttributes.push({
+//                 name: attr.name,
+//                 value: attr.value,
+//                 type: 'variation',
+//                 variationId: variation._id
+//               });
+//             }
+//           });
+//         }
+//       });
+
+//       return {
+//         _id: productObj._id,
+//         name: productObj.name,
+//         slug: productObj.slug,
+//         sku: productObj.sku,
+//         description: productObj.description,
+//         shortDescription: productObj.shortDescription,
+//         category: productObj.category,
+//         subCategory: productObj.subCategory,
+//         status: productObj.status,
+//         featured: productObj.featured,
+//         bestseller: productObj.bestseller,
+//         mainImage: mainImage ? {
+//           url: mainImage.url,
+//           public_id: mainImage.public_id,
+//           isMain: mainImage.isMain
+//         } : null,
+//         colors: colorsDetailed.map(c => c.name),
+//         colorsDetailed: colorsDetailed,
+//         price: mainVariation?.price || 0,
+//         comparePrice: mainVariation?.comparePrice || 0,
+//         priceRange: {
+//           min: minProductPrice,
+//           max: maxProductPrice
+//         },
+//         totalStock: variations.reduce((sum, v) => sum + (v.stock || 0), 0),
+//         matchingAttributes: matchingAttributes,
+//         variationsCount: variations.length,
+//         _debug: {
+//           hasImage: !!mainImage,
+//           hasColors: colorsDetailed.length > 0,
+//           variationsFound: variations.length,
+//           matchingAttributesCount: matchingAttributes.length
+//         }
+//       };
+//     });
+    
+//     // Format categories with full path
+//     const formattedCategories = categories.map(cat => ({
+//       _id: cat._id,
+//       name: cat.name,
+//       slug: cat.slug,
+//       image: cat.image,
+//       level: cat.level,
+//       displayPath: cat.displayPath,  // "Boots Man Shoes"
+//       pathNames: cat.pathNames,      // ["Boots", "Man", "Shoes"]
+//       pathSlugs: cat.pathSlugs,      // ["boots", "man", "shoes"]
+//       type: 'category'
+//     }));
+
+//     const formattedBrands = brands.map(brand => ({
+//       name: brand.name,
+//       count: brand.count,
+//       type: 'brand'
+//     }));
+
+//     res.status(200).json({
+//       success: true,
+//       count: processedProducts.length,
+//       data: processedProducts,
+//       categories: formattedCategories,
+//       brands: formattedBrands,
+//       debug: {
+//         categoriesFound: formattedCategories.length,
+//         brandsFound: formattedBrands.length,
+//         productsFound: processedProducts.length
+//       }
+//     });
+    
+//   } catch (error) {
+//     console.error('Error in searchProducts:', error);
+//     next(error);
+//   }
+// };
 exports.searchProducts = async (req, res, next) => {
   try {
     const { q, category, status, minPrice, maxPrice, limit = 20 } = req.query;
     
-    let query = {};
+    if (!q || q.length < 2) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        data: [],
+        categories: [],
+        brands: []
+      });
+    }
     
-    // Text search
+    const searchRegex = new RegExp(q, 'i');
+    
+    // 1️⃣ **First find categories that match the search term**
+    const matchingCategories = await Category.find({
+      name: searchRegex,
+      status: 'active'
+    }).select('_id');
+
+    const matchingCategoryIds = matchingCategories.map(c => c._id);
+
+    // 2️⃣ **Find ALL categories**
+    const categories = await Category.aggregate([
+      {
+        $match: {
+          $or: [
+            // Direct name match
+            { name: searchRegex, status: 'active' },
+            
+            // Children of matching categories
+            { parent: { $in: matchingCategoryIds }, status: 'active' }
+          ]
+        }
+      },
+      
+      // Lookup parent categories
+      { 
+        $graphLookup: {
+          from: "categories",
+          startWith: "$parent",
+          connectFromField: "parent",
+          connectToField: "_id",
+          as: "ancestors",
+          depthField: "depth",
+          maxDepth: 10
+        }
+      },
+      
+      // Build full path
+      { 
+        $addFields: {
+          // All categories in path (current + ancestors)
+          allCategoriesInPath: {
+            $concatArrays: [
+              ["$$ROOT"],
+              { $ifNull: ["$ancestors", []] }
+            ]
+          }
+        }
+      },
+      
+      // Sort path from root to leaf
+      {
+        $addFields: {
+          sortedPath: {
+            $sortArray: {
+              input: "$allCategoriesInPath",
+              sortBy: { depth: 1 }
+            }
+          }
+        }
+      },
+      
+      // Create display path
+      {
+        $addFields: {
+          // All names in path
+          pathNames: {
+            $map: {
+              input: "$sortedPath",
+              as: "cat",
+              in: "$$cat.name"
+            }
+          },
+          // All slugs in path
+          pathSlugs: {
+            $map: {
+              input: "$sortedPath",
+              as: "cat",
+              in: "$$cat.slug"
+            }
+          },
+          // Display string
+          displayPath: {
+            $reduce: {
+              input: {
+                $reverseArray: "$sortedPath"
+              },
+              initialValue: "",
+              in: {
+                $concat: [
+                  "$$value",
+                  { $cond: [{ $eq: ["$$value", ""] }, "", " "] },
+                  "$$this.name"
+                ]
+              }
+            }
+          }
+        }
+      },
+      
+      // Add relevance score
+      {
+        $addFields: {
+          relevance: {
+            $cond: [
+              { $regexMatch: { input: "$name", regex: searchRegex } },
+              1,
+              2
+            ]
+          }
+        }
+      },
+      
+      // Sort
+      { $sort: { relevance: 1, name: 1 } },
+      
+      // Limit
+      { $limit: 10 },
+      
+      // Project final fields
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          slug: 1,
+          image: 1,
+          level: 1,
+          parent: 1,
+          pathNames: 1,
+          pathSlugs: 1,
+          displayPath: 1,
+          relevance: 1,
+          matchType: {
+            $cond: [
+              { $regexMatch: { input: "$name", regex: searchRegex } },
+              "direct",
+              "child"
+            ]
+          }
+        }
+      }
+    ]);
+
+    console.log('Found categories:', categories.length);
+
+    // 3️⃣ **Search Brands**
+    const brandResults = await Product.aggregate([
+      // First unwind attributes
+      { $unwind: { path: "$attributes", preserveNullAndEmptyArrays: true } },
+      // Match brand attributes with search term
+      { $match: { 
+        "attributes.name": "Brand",
+        "attributes.value": searchRegex
+      }},
+      // Group by brand value
+      { $group: {
+        _id: "$attributes.value",
+        count: { $sum: 1 },
+        productIds: { $addToSet: "$_id" }
+      }},
+      { $sort: { count: -1 } },
+      { $limit: 5 }
+    ]);
+
+    const variationBrandResults = await Product.aggregate([
+      // Unwind variations
+      { $unwind: { path: "$variations", preserveNullAndEmptyArrays: true } },
+      // Unwind variation attributes
+      { $unwind: { path: "$variations.attributes", preserveNullAndEmptyArrays: true } },
+      // Match brand attributes
+      { $match: { 
+        "variations.attributes.name": "Brand",
+        "variations.attributes.value": searchRegex
+      }},
+      // Group by brand value
+      { $group: {
+        _id: "$variations.attributes.value",
+        count: { $sum: 1 },
+        productIds: { $addToSet: "$_id" }
+      }},
+      { $sort: { count: -1 } },
+      { $limit: 5 }
+    ]);
+
+    // Combine brand results
+    const brandMap = new Map();
+    
+    [...brandResults, ...variationBrandResults].forEach(b => {
+      if (b && b._id) {
+        if (brandMap.has(b._id)) {
+          const existing = brandMap.get(b._id);
+          existing.count += b.count;
+          existing.productIds = [...new Set([...existing.productIds, ...b.productIds])];
+        } else {
+          brandMap.set(b._id, {
+            name: b._id,
+            count: b.count,
+            productIds: b.productIds || []
+          });
+        }
+      }
+    });
+
+    const brands = Array.from(brandMap.values());
+
+    // 4️⃣ **Search Products**
+    let productQuery = { status: 'active' };
+    
     if (q) {
-      query.$or = [
-        { name: { $regex: q, $options: 'i' } },
-        { description: { $regex: q, $options: 'i' } },
-        { sku: { $regex: q, $options: 'i' } }
+      productQuery.$or = [
+        { name: searchRegex },
+        { description: searchRegex },
+        { shortDescription: searchRegex },
+        { sku: searchRegex },
+        { "attributes.value": searchRegex },
+        { "variations.attributes.value": searchRegex }
       ];
     }
     
-    // Category filter
     if (category) {
-      query.category = category;
+      productQuery.category = category;
     }
     
-    // Status filter
-    if (status) {
-      query.status = status;
-    }
-    
-    // Price range filter
     if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = Number(minPrice);
-      if (maxPrice) query.price.$lte = Number(maxPrice);
+      productQuery["variations.price"] = {};
+      if (minPrice) productQuery["variations.price"].$gte = Number(minPrice);
+      if (maxPrice) productQuery["variations.price"].$lte = Number(maxPrice);
     }
     
-    const products = await Product.find(query)
+    const products = await Product.find(productQuery)
       .populate('category', 'name slug')
-      .populate('subCategory', 'name slug') // Add this if you have subCategory
+      .populate('subCategory', 'name slug')
       .limit(parseInt(limit))
-      .select('name sku stock category status slug subCategory'); // Add slug here
+      .select('name sku slug description shortDescription category subCategory status featured bestseller colorImages variations attributes');
+
+    // Process products
+    const processedProducts = products.map(product => {
+      const productObj = product.toObject();
+      const variations = productObj.variations || [];
+      const mainVariation = variations.find(v => v.isMain === true) || variations[0];
+      
+      // Create color image map
+      const colorImageMap = new Map();
+      if (productObj.colorImages && productObj.colorImages.length > 0) {
+        productObj.colorImages.forEach(colorImage => {
+          if (colorImage && colorImage.color && colorImage.images) {
+            colorImageMap.set(colorImage.color, colorImage.images);
+          }
+        });
+      }
+      
+      // Get main image
+      let mainImage = null;
+      if (mainVariation) {
+        const colorAttr = mainVariation.attributes?.find(attr => 
+          attr && attr.name && attr.name.toLowerCase() === 'color'
+        );
+        const color = colorAttr ? colorAttr.value : mainVariation.color;
+        
+        if (color && colorImageMap.has(color)) {
+          const images = colorImageMap.get(color);
+          mainImage = images.find(img => img && img.isMain) || images[0];
+        }
+      }
+      
+      // Fallback to first image
+      if (!mainImage && productObj.colorImages && productObj.colorImages.length > 0) {
+        const firstColor = productObj.colorImages[0];
+        if (firstColor && firstColor.images && firstColor.images.length > 0) {
+          mainImage = firstColor.images.find(img => img && img.isMain) || firstColor.images[0];
+        }
+      }
+
+      // Get price range
+      const prices = variations
+        .map(v => v.price || 0)
+        .filter(p => p > 0);
+      
+      const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+      const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+
+      return {
+        _id: productObj._id,
+        name: productObj.name,
+        slug: productObj.slug,
+        sku: productObj.sku,
+        description: productObj.description,
+        shortDescription: productObj.shortDescription,
+        category: productObj.category,
+        subCategory: productObj.subCategory,
+        status: productObj.status,
+        featured: productObj.featured,
+        bestseller: productObj.bestseller,
+        mainImage: mainImage ? {
+          url: mainImage.url,
+          public_id: mainImage.public_id,
+          isMain: mainImage.isMain
+        } : null,
+        price: mainVariation?.price || 0,
+        comparePrice: mainVariation?.comparePrice || 0,
+        priceRange: {
+          min: minPrice,
+          max: maxPrice
+        },
+        totalStock: variations.reduce((sum, v) => sum + (v.stock || 0), 0)
+      };
+    });
     
+    // Format categories
+    const formattedCategories = categories.map(cat => ({
+      _id: cat._id,
+      name: cat.name,
+      slug: cat.slug,
+      image: cat.image,
+      level: cat.level,
+      displayPath: cat.displayPath || cat.name,
+      pathNames: cat.pathNames || [cat.name],
+      pathSlugs: cat.pathSlugs || [cat.slug],
+      matchType: cat.matchType || 'direct',
+      type: 'category'
+    }));
+
+    // Format brands
+    const formattedBrands = brands.map(brand => ({
+      name: brand.name,
+      count: brand.count,
+      type: 'brand'
+    }));
+
     res.status(200).json({
       success: true,
-      count: products.length,
-      data: products
+      count: processedProducts.length,
+      data: processedProducts,
+      categories: formattedCategories,
+      brands: formattedBrands,
+      debug: {
+        categoriesFound: formattedCategories.length,
+        brandsFound: formattedBrands.length,
+        productsFound: processedProducts.length
+      }
     });
+    
   } catch (error) {
-    next(error);
+    console.error('Error in searchProducts:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error searching products',
+      error: error.message
+    });
   }
 };
 

@@ -28,6 +28,9 @@ const cartRoutes = require('./routes/cartRoutes');
 const wishlistRoutes = require('./routes/wishlistRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const basicRoutes = require('./routes/basicRoutes');
+const faviconRoutes = require('./routes/faviconRoutes');
+const razorpayRoutes = require('./routes/razorpayRoutes');
+const shiprocketRoutes = require('./routes/shiprocketRoutes');
 
 // Initialize app
 const app = express();
@@ -90,6 +93,9 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/basic', basicRoutes);
+app.use('/api/favicon', faviconRoutes);
+app.use('/api/razorpay', razorpayRoutes);
+app.use('/api/shiprocket', shiprocketRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

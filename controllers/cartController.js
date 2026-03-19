@@ -2,6 +2,168 @@ const Cart = require('../models/cart');
 
 
 // Get cart items
+// exports.getCartItems = async (req, res) => {
+//   try {
+//     const userId = req.user._id;
+    
+//     const cart = await Cart.findOne({ userId })
+//       .populate({
+//         path: 'items.productId',
+//         select: 'name slug sku description shortDescription category subCategory status featured bestseller colorImages variations',
+//         populate: [
+//           {
+//             path: 'category',
+//             select: 'name slug'
+//           },
+//           {
+//             path: 'subCategory',
+//             select: 'name slug'
+//           }
+//         ]
+//       });
+
+//     if (!cart) {
+//       return res.status(200).json({
+//         success: true,
+//         data: { items: [] }
+//       });
+//     }
+
+//     // Process each item to get variation details with main image
+//     const enhancedItems = await Promise.all(cart.items.map(async (item) => {
+//       try {
+//         const product = item.productId;
+//         const variationId = item.variationId;
+
+//         let variationDetails = null;
+//         let mainImage = null;
+
+//         // ✅ Find the specific variation by ID
+//         if (product.variations && product.variations.length > 0) {
+//           variationDetails = product.variations.find(v => 
+//             v._id.toString() === variationId.toString()
+//           );
+
+//           // ✅ Get main image for this variation's color (isMain: true)
+//           if (variationDetails && variationDetails.color && product.colorImages) {
+            
+//             const colorGroup = product.colorImages.find(ci => {
+//               // Handle both string and object cases
+//               const colorGroupColor = ci.color || (ci._doc?.color);
+//               return colorGroupColor === variationDetails.color;
+//             });
+            
+//             if (colorGroup && colorGroup.images) {
+              
+//               // Find image with isMain: true
+//               mainImage = colorGroup.images.find(img => img.isMain === true);
+              
+//               // If no main image found, use first image
+//               if (!mainImage && colorGroup.images.length > 0) {
+//                 mainImage = colorGroup.images[0];
+//               }
+//             } else {
+//               console.log("No color group found for color:", variationDetails.color);
+//             }
+//           }
+//         }
+
+//         // ✅ If variation not found by ID, try to find by matching attributes
+//         if (!variationDetails && product.variations && product.variations.length > 0) {
+          
+//           // Get the variation from cart item's original data if available
+//           const originalVariation = item.variationDetails || item.variation;
+          
+//           if (originalVariation && originalVariation.attributes) {
+//             // Try to find variation with matching attributes
+//             variationDetails = product.variations.find(v => {
+//               // Compare attributes
+//               const vAttrs = v.attributes || [];
+//               const oAttrs = originalVariation.attributes || [];
+              
+//               // Simple comparison - check if color matches
+//               const vColorAttr = vAttrs.find(a => a.name?.toLowerCase() === 'color');
+//               const oColorAttr = oAttrs.find(a => a.name?.toLowerCase() === 'color');
+              
+//               if (vColorAttr && oColorAttr && vColorAttr.value === oColorAttr.value) {
+//                 return true;
+//               }
+              
+//               // Check if price matches
+//               if (v.price === originalVariation.price) {
+//                 return true;
+//               }
+              
+//               return false;
+//             });
+            
+//           }
+//         }
+
+//         // ✅ If still not found, use main variation or first variation
+//         if (!variationDetails && product.variations && product.variations.length > 0) {
+//           variationDetails = product.variations.find(v => v.isMain === true) || product.variations[0];
+          
+//           // Get image for this variation's color
+//           if (variationDetails && variationDetails.color && product.colorImages) {
+//             const colorGroup = product.colorImages.find(ci => ci.color === variationDetails.color);
+            
+//             if (colorGroup && colorGroup.images) {
+//               // Find image with isMain: true
+//               mainImage = colorGroup.images.find(img => img.isMain === true);
+              
+//               // If no main image found, use first image
+//               if (!mainImage && colorGroup.images.length > 0) {
+//                 mainImage = colorGroup.images[0];
+//               }
+//             }
+//           }
+//         }
+
+//         // ✅ Create enhanced variation details with main image
+//         const enhancedVariationDetails = variationDetails ? {
+//           _id: variationDetails._id,
+//           sku: variationDetails.sku,
+//           price: variationDetails.price,
+//           comparePrice: variationDetails.comparePrice,
+//           stock: variationDetails.stock,
+//           status: variationDetails.status,
+//           isMain: variationDetails.isMain,
+//           color: variationDetails.color,
+//           attributes: variationDetails.attributes || [],
+//           mainImage: mainImage, // ✅ This is the correct image for this variation's color
+//           images: variationDetails.images || []
+//         } : null;
+
+//         return {
+//           ...item.toObject(),
+//           variationDetails: enhancedVariationDetails
+//         };
+//       } catch (error) {
+//         console.error('Error processing cart item:', error);
+//         return item;
+//       }
+//     }));
+
+//     const enhancedCart = {
+//       ...cart.toObject(),
+//       items: enhancedItems
+//     };
+
+//     res.status(200).json({
+//       success: true,
+//       data: enhancedCart
+//     });
+//   } catch (error) {
+//     console.error('Get cart items error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Server Error',
+//       error: error.message
+//     });
+//   }
+// };
+
 exports.getCartItems = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -37,6 +199,20 @@ exports.getCartItems = async (req, res) => {
 
         let variationDetails = null;
         let mainImage = null;
+        let colorImages = []; // Store all images for this color
+
+        // ✅ First, create a map of color to images from colorImages array
+        const colorImageMap = new Map();
+        if (product.colorImages && product.colorImages.length > 0) {
+          product.colorImages.forEach(colorImage => {
+            if (colorImage.color && colorImage.images) {
+              colorImageMap.set(colorImage.color, {
+                images: colorImage.images,
+                color: colorImage.color
+              });
+            }
+          });
+        }
 
         // ✅ Find the specific variation by ID
         if (product.variations && product.variations.length > 0) {
@@ -44,26 +220,29 @@ exports.getCartItems = async (req, res) => {
             v._id.toString() === variationId.toString()
           );
 
-          // ✅ Get main image for this variation's color (isMain: true)
-          if (variationDetails && variationDetails.color && product.colorImages) {
+          // ✅ Get images for this variation's color from colorImageMap
+          if (variationDetails) {
+            // Find the color attribute
+            const colorAttr = variationDetails.attributes?.find(attr => 
+              attr.name && attr.name.toLowerCase() === 'color'
+            );
             
-            const colorGroup = product.colorImages.find(ci => {
-              // Handle both string and object cases
-              const colorGroupColor = ci.color || (ci._doc?.color);
-              return colorGroupColor === variationDetails.color;
-            });
+            const colorValue = colorAttr ? colorAttr.value : variationDetails.color;
             
-            if (colorGroup && colorGroup.images) {
+            if (colorValue) {
+              const colorImageData = colorImageMap.get(colorValue);
               
-              // Find image with isMain: true
-              mainImage = colorGroup.images.find(img => img.isMain === true);
-              
-              // If no main image found, use first image
-              if (!mainImage && colorGroup.images.length > 0) {
-                mainImage = colorGroup.images[0];
+              if (colorImageData && colorImageData.images) {
+                colorImages = colorImageData.images;
+                
+                // Find image with isMain: true
+                mainImage = colorImages.find(img => img.isMain === true);
+                
+                // If no main image found, use first image
+                if (!mainImage && colorImages.length > 0) {
+                  mainImage = colorImages[0];
+                }
               }
-            } else {
-              console.log("No color group found for color:", variationDetails.color);
             }
           }
         }
@@ -81,7 +260,7 @@ exports.getCartItems = async (req, res) => {
               const vAttrs = v.attributes || [];
               const oAttrs = originalVariation.attributes || [];
               
-              // Simple comparison - check if color matches
+              // Check if color matches
               const vColorAttr = vAttrs.find(a => a.name?.toLowerCase() === 'color');
               const oColorAttr = oAttrs.find(a => a.name?.toLowerCase() === 'color');
               
@@ -97,6 +276,23 @@ exports.getCartItems = async (req, res) => {
               return false;
             });
             
+            // If found, get images for this variation
+            if (variationDetails) {
+              const colorAttr = variationDetails.attributes?.find(attr => 
+                attr.name && attr.name.toLowerCase() === 'color'
+              );
+              
+              const colorValue = colorAttr ? colorAttr.value : variationDetails.color;
+              
+              if (colorValue) {
+                const colorImageData = colorImageMap.get(colorValue);
+                
+                if (colorImageData && colorImageData.images) {
+                  colorImages = colorImageData.images;
+                  mainImage = colorImages.find(img => img.isMain === true) || colorImages[0];
+                }
+              }
+            }
           }
         }
 
@@ -104,23 +300,26 @@ exports.getCartItems = async (req, res) => {
         if (!variationDetails && product.variations && product.variations.length > 0) {
           variationDetails = product.variations.find(v => v.isMain === true) || product.variations[0];
           
-          // Get image for this variation's color
-          if (variationDetails && variationDetails.color && product.colorImages) {
-            const colorGroup = product.colorImages.find(ci => ci.color === variationDetails.color);
+          // Get images for this variation's color
+          if (variationDetails) {
+            const colorAttr = variationDetails.attributes?.find(attr => 
+              attr.name && attr.name.toLowerCase() === 'color'
+            );
             
-            if (colorGroup && colorGroup.images) {
-              // Find image with isMain: true
-              mainImage = colorGroup.images.find(img => img.isMain === true);
+            const colorValue = colorAttr ? colorAttr.value : variationDetails.color;
+            
+            if (colorValue) {
+              const colorImageData = colorImageMap.get(colorValue);
               
-              // If no main image found, use first image
-              if (!mainImage && colorGroup.images.length > 0) {
-                mainImage = colorGroup.images[0];
+              if (colorImageData && colorImageData.images) {
+                colorImages = colorImageData.images;
+                mainImage = colorImages.find(img => img.isMain === true) || colorImages[0];
               }
             }
           }
         }
 
-        // ✅ Create enhanced variation details with main image
+        // ✅ Create enhanced variation details with main image and all images
         const enhancedVariationDetails = variationDetails ? {
           _id: variationDetails._id,
           sku: variationDetails.sku,
@@ -131,13 +330,38 @@ exports.getCartItems = async (req, res) => {
           isMain: variationDetails.isMain,
           color: variationDetails.color,
           attributes: variationDetails.attributes || [],
-          mainImage: mainImage, // ✅ This is the correct image for this variation's color
-          images: variationDetails.images || []
+          mainImage: mainImage, // ✅ Single main image
+          images: colorImages, // ✅ All images for this color
+          imagesCount: colorImages.length // For debugging
         } : null;
 
         return {
-          ...item.toObject(),
-          variationDetails: enhancedVariationDetails
+          _id: item._id,
+          productId: {
+            _id: product._id,
+            name: product.name,
+            slug: product.slug,
+            sku: product.sku,
+            description: product.description,
+            shortDescription: product.shortDescription,
+            category: product.category,
+            subCategory: product.subCategory,
+            status: product.status,
+            featured: product.featured,
+            bestseller: product.bestseller
+          },
+          variationId: item.variationId,
+          quantity: item.quantity,
+          price: item.price,
+          addedAt: item.addedAt,
+          variationDetails: enhancedVariationDetails,
+          
+          // ✅ For debugging - check color mapping
+          _debug: {
+            variationColor: variationDetails?.color,
+            colorImagesFound: colorImages.length,
+            colorImageMapSize: colorImageMap.size
+          }
         };
       } catch (error) {
         console.error('Error processing cart item:', error);
@@ -146,8 +370,13 @@ exports.getCartItems = async (req, res) => {
     }));
 
     const enhancedCart = {
-      ...cart.toObject(),
-      items: enhancedItems
+      _id: cart._id,
+      userId: cart.userId,
+      items: enhancedItems,
+      totalItems: cart.totalItems,
+      totalPrice: cart.totalPrice,
+      createdAt: cart.createdAt,
+      updatedAt: cart.updatedAt
     };
 
     res.status(200).json({

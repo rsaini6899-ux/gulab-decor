@@ -30,6 +30,11 @@ router.post('/create-cod-order', authMiddleware, orderController.createCODOrder)
 router.post('/create-razorpay-order', authMiddleware, orderController.createRazorpayOrder);
 router.post('/verify-razorpay-payment', authMiddleware,  orderController.verifyRazorpayPayment);
 
+// Shipment routes (admin only)
+router.post('/:orderId/shipment', authMiddleware, orderController.createShipment);
+router.get('/track/:awb', orderController.trackShipment);
+router.post('/shipment/:shipmentId/cancel', authMiddleware, orderController.cancelShipment);
+
 // Order management routes
 router.put('/cancel/:orderId', authMiddleware, orderController.cancelOrder);
 

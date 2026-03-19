@@ -12,9 +12,9 @@ const {
 const authMiddleware = require('../middleware/auth');
 
 // Public routes
-router.post('/send/sms-otp', sendSmsOTP);
-router.post('/verify/sms-otp', verifySmsOTP);
-router.post('/resend/sms-otp', resendSmsOTP);
+router.post('/sms/send-otp', sendSmsOTP);
+router.post('/sms/verify-otp', verifySmsOTP);
+router.post('/resend-sms-otp', resendSmsOTP);
 
 router.post('/upload-image', 
   cloudinaryUpload('auth').single('avatar'),
