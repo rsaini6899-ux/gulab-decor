@@ -94,5 +94,8 @@ router.get('/categories/:categorySlug/:subCategorySlug/products', productControl
 // एक ही API - कितने भी लेवल के लिए काम करेगा
 router.get('/categories/*/products', productController.getProductsByCategoryPath);
 
+router.get('/blog-type/:blogType', productController.getProductsByBlogType);
+router.get('/brand/:brandName', productController.getProductsByBrand);
+
 
 module.exports = router;

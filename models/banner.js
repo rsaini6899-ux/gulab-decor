@@ -16,7 +16,7 @@ const bannerSchema = new mongoose.Schema({
   desktopImage: {
     url: {
       type: String,
-      required: [true, 'Desktop banner image is required']
+      // required: [true, 'Desktop banner image is required']
     },
     public_id: {
       type: String,
@@ -29,7 +29,7 @@ const bannerSchema = new mongoose.Schema({
   mobileImage: {
     url: {
       type: String,
-      required: [true, 'Mobile banner image is required']
+      // required: [true, 'Mobile banner image is required']
     },
     public_id: {
       type: String,

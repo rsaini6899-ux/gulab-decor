@@ -757,10 +757,10 @@ exports.createProduct = async (req, res, next) => {
         stock: variation.stock,
         status: variation.status || 'active',
         attributes: variation.attributes || [],
-        color: colorAttr?.value, // ✅ Store color separately
+        color: colorAttr?.value, // Store color separately
         isMain: variation.isMain || false,
         isGroupMain: variation.isGroupMain || false
-        // ❌ DON'T include images array here
+        // DON'T include images array here
       };
       
       // Remove undefined values
@@ -773,7 +773,8 @@ exports.createProduct = async (req, res, next) => {
       return newVariation;
     });
 
-        let categoryPath = [req.body.category];
+    // Build category path
+    let categoryPath = [req.body.category];
     if (req.body.subCategory) {
       categoryPath.push(req.body.subCategory);
     }
@@ -784,7 +785,7 @@ exports.createProduct = async (req, res, next) => {
       categoryPath.push(req.body.grandChildCategory);
     }
     
-    // Prepare product data
+    // ✅ Prepare product data with type field
     const productData = {
       name: req.body.name,
       slug: req.body.slug,
@@ -804,10 +805,13 @@ exports.createProduct = async (req, res, next) => {
       trackInventory: req.body.trackInventory !== false,
       lowStockThreshold: req.body.lowStockThreshold || 10,
       
+      // ✅ NEW: Type field for blog category
+      type: req.body.type || undefined, // यहाँ blog category store होगी
+      
       // Dynamic fields
       attributes: req.body.attributes || [],
       
-      // ✅ Use processed variations and color images
+      // Use processed variations and color images
       variations: variationsWithoutImages,
       colorImages: colorImagesArray,
       
@@ -837,7 +841,7 @@ exports.createProduct = async (req, res, next) => {
       }
     }
     
-    // ✅ Get product with virtual variationsWithImages
+    // Get product with virtual variationsWithImages
     const productWithImages = await Product.findById(product._id);
     
     res.status(201).json({
@@ -1090,6 +1094,9 @@ exports.updateProduct = async (req, res, next) => {
       req.body.variations = cleanedVariations;
     }
     
+    // ✅ STEP 2: Handle type field (blog category)
+    // type field is directly passed from frontend, no special processing needed
+    
     // Remove undefined values
     Object.keys(req.body).forEach(key => {
       if (req.body[key] === undefined || req.body[key] === '') {
@@ -1147,7 +1154,6 @@ exports.updateProduct = async (req, res, next) => {
     });
   }
 };
-
 
 // Delete product
 exports.deleteProduct = async (req, res, next) => {
@@ -1267,386 +1273,6 @@ exports.updateStock = async (req, res, next) => {
 };
 
 // Search products
-// exports.searchProducts = async (req, res, next) => {
-//   try {
-//     const { q, category, status, minPrice, maxPrice, limit = 20 } = req.query;
-    
-//     if (!q || q.length < 2) {
-//       return res.status(200).json({
-//         success: true,
-//         count: 0,
-//         data: [],
-//         categories: [],
-//         brands: []
-//       });
-//     }
-    
-//     const searchRegex = new RegExp(q, 'i');
-    
-//     // 1️⃣ **Search Categories with their full path**
-//     const categories = await Category.aggregate([
-//       // Match categories that have the search term
-//       { $match: { 
-//         name: searchRegex,
-//         status: 'active'
-//       }},
-      
-//       // Lookup parent categories recursively to build path
-//       { 
-//         $graphLookup: {
-//           from: "categories",
-//           startWith: "$parent",
-//           connectFromField: "parent",
-//           connectToField: "_id",
-//           as: "ancestors",
-//           depthField: "depth",
-//           maxDepth: 10
-//         }
-//       },
-      
-//       // Add path information
-//       { 
-//         $addFields: {
-//           // Sort ancestors by depth (closest first)
-//           sortedAncestors: {
-//             $sortArray: {
-//               input: "$ancestors",
-//               sortBy: { depth: -1 }
-//             }
-//           },
-//           // Build full path array: [current, parent, grandparent, ...]
-//           fullPath: {
-//             $concatArrays: [
-//               ["$$ROOT"],
-//               "$ancestors"
-//             ]
-//           }
-//         }
-//       },
-      
-//       // Sort full path by depth (root to leaf)
-//       {
-//         $addFields: {
-//           fullPath: {
-//             $sortArray: {
-//               input: "$fullPath",
-//               sortBy: { depth: 1 }
-//             }
-//           }
-//         }
-//       },
-      
-//       // Format the response
-//       {
-//         $project: {
-//           _id: 1,
-//           name: 1,
-//           slug: 1,
-//           image: 1,
-//           level: 1,
-//           parent: 1,
-//           // Create display path: "Child -> Parent -> Grandparent"
-//           displayPath: {
-//             $reduce: {
-//               input: {
-//                 $reverseArray: "$fullPath"
-//               },
-//               initialValue: "",
-//               in: {
-//                 $concat: [
-//                   "$$value",
-//                   { $cond: [{ $eq: ["$$value", ""] }, "", " " ] },
-//                   "$$this.name"
-//                 ]
-//               }
-//             }
-//           },
-//           // Array of all names in path
-//           pathNames: {
-//             $map: {
-//               input: {
-//                 $reverseArray: "$fullPath"
-//               },
-//               as: "cat",
-//               in: "$$cat.name"
-//             }
-//           },
-//           // Array of all slugs in path
-//           pathSlugs: {
-//             $map: {
-//               input: {
-//                 $reverseArray: "$fullPath"
-//               },
-//               as: "cat",
-//               in: "$$cat.slug"
-//             }
-//           }
-//         }
-//       },
-      
-//       // Sort by name
-//       { $sort: { name: 1 } },
-      
-//       // Limit results
-//       { $limit: 5 }
-//     ]);
-
-//     console.log('Found categories with paths:', categories.map(c => ({
-//       name: c.name,
-//       path: c.displayPath,
-//       pathNames: c.pathNames
-//     })));
-
-//     // 2️⃣ **Search Brands (same as before)**
-//     const brandResults = await Product.aggregate([
-//       { $match: { 
-//         $or: [
-//           { "attributes.value": searchRegex },
-//           { "variations.attributes.value": searchRegex }
-//         ]
-//       }},
-//       { $unwind: { path: "$attributes", preserveNullAndEmptyArrays: true } },
-//       { $match: { 
-//         "attributes.name": "Brand",
-//         "attributes.value": searchRegex
-//       }},
-//       { $group: {
-//         _id: "$attributes.value",
-//         count: { $sum: 1 },
-//         productIds: { $addToSet: "$_id" }
-//       }},
-//       { $sort: { count: -1 } },
-//       { $limit: 5 }
-//     ]);
-
-//     const variationBrandResults = await Product.aggregate([
-//       { $match: { 
-//         $or: [
-//           { "attributes.value": searchRegex },
-//           { "variations.attributes.value": searchRegex }
-//         ]
-//       }},
-//       { $unwind: { path: "$variations", preserveNullAndEmptyArrays: true } },
-//       { $unwind: { path: "$variations.attributes", preserveNullAndEmptyArrays: true } },
-//       { $match: { 
-//         "variations.attributes.name": "Brand",
-//         "variations.attributes.value": searchRegex
-//       }},
-//       { $group: {
-//         _id: "$variations.attributes.value",
-//         count: { $sum: 1 },
-//         productIds: { $addToSet: "$_id" }
-//       }},
-//       { $sort: { count: -1 } },
-//       { $limit: 5 }
-//     ]);
-
-//     // Combine both brand results
-//     const brandMap = new Map();
-//     [...brandResults, ...variationBrandResults].forEach(b => {
-//       if (b._id) {
-//         if (brandMap.has(b._id)) {
-//           brandMap.get(b._id).count += b.count;
-//           brandMap.get(b._id).productIds = [...new Set([...brandMap.get(b._id).productIds, ...b.productIds])];
-//         } else {
-//           brandMap.set(b._id, {
-//             name: b._id,
-//             count: b.count,
-//             productIds: b.productIds
-//           });
-//         }
-//       }
-//     });
-
-//     const brands = Array.from(brandMap.values());
-
-//     // 3️⃣ **Search Products (same as before)**
-//     let productQuery = { status: 'active' };
-    
-//     if (q) {
-//       productQuery.$or = [
-//         { name: searchRegex },
-//         { description: searchRegex },
-//         { shortDescription: searchRegex },
-//         { sku: searchRegex },
-//         { "attributes.value": searchRegex },
-//         { "variations.attributes.value": searchRegex }
-//       ];
-//     }
-    
-//     if (category) {
-//       productQuery.category = category;
-//     }
-    
-//     if (minPrice || maxPrice) {
-//       productQuery["variations.price"] = {};
-//       if (minPrice) productQuery["variations.price"].$gte = Number(minPrice);
-//       if (maxPrice) productQuery["variations.price"].$lte = Number(maxPrice);
-//     }
-    
-//     const products = await Product.find(productQuery)
-//       .populate('category', 'name slug')
-//       .populate('subCategory', 'name slug')
-//       .limit(parseInt(limit))
-//       .select('name sku slug description shortDescription category subCategory status featured bestseller colorImages variations attributes');
-
-//     // Process products (same as before)
-//     const processedProducts = products.map(product => {
-//       const productObj = product.toObject();
-//       const variations = productObj.variations || [];
-//       const mainVariation = variations.find(v => v.isMain === true) || variations[0];
-      
-//       const colorImageMap = new Map();
-//       if (productObj.colorImages && productObj.colorImages.length > 0) {
-//         productObj.colorImages.forEach(colorImage => {
-//           if (colorImage.color && colorImage.images) {
-//             colorImageMap.set(colorImage.color, {
-//               images: colorImage.images,
-//               color: colorImage.color
-//             });
-//           }
-//         });
-//       }
-      
-//       let mainImage = null;
-//       let productColor = null;
-      
-//       if (mainVariation) {
-//         const colorAttr = mainVariation.attributes?.find(attr => 
-//           attr.name && attr.name.toLowerCase() === 'color'
-//         );
-//         productColor = colorAttr ? colorAttr.value : mainVariation.color;
-        
-//         if (productColor) {
-//           const colorImageData = colorImageMap.get(productColor);
-//           if (colorImageData && colorImageData.images && colorImageData.images.length > 0) {
-//             mainImage = colorImageData.images.find(img => img.isMain === true) || colorImageData.images[0];
-//           }
-//         }
-//       }
-      
-//       if (!mainImage && productObj.colorImages && productObj.colorImages.length > 0) {
-//         const firstColorGroup = productObj.colorImages[0];
-//         if (firstColorGroup && firstColorGroup.images && firstColorGroup.images.length > 0) {
-//           mainImage = firstColorGroup.images.find(img => img.isMain === true) || firstColorGroup.images[0];
-//         }
-//       }
-
-//       const colorsDetailed = [];
-//       colorImageMap.forEach((value, color) => {
-//         colorsDetailed.push({
-//           name: color,
-//           images: value.images,
-//           mainImage: value.images.find(img => img.isMain === true) || value.images[0]
-//         });
-//       });
-
-//       const prices = variations.map(v => v.price || 0).filter(p => p > 0);
-//       const minProductPrice = prices.length > 0 ? Math.min(...prices) : 0;
-//       const maxProductPrice = prices.length > 0 ? Math.max(...prices) : 0;
-
-//       const matchingAttributes = [];
-//       if (productObj.attributes) {
-//         productObj.attributes.forEach(attr => {
-//           if (attr.value && attr.value.toLowerCase().includes(q.toLowerCase())) {
-//             matchingAttributes.push({
-//               name: attr.name,
-//               value: attr.value,
-//               type: 'product'
-//             });
-//           }
-//         });
-//       }
-      
-//       variations.forEach(variation => {
-//         if (variation.attributes) {
-//           variation.attributes.forEach(attr => {
-//             if (attr.value && attr.value.toLowerCase().includes(q.toLowerCase())) {
-//               matchingAttributes.push({
-//                 name: attr.name,
-//                 value: attr.value,
-//                 type: 'variation',
-//                 variationId: variation._id
-//               });
-//             }
-//           });
-//         }
-//       });
-
-//       return {
-//         _id: productObj._id,
-//         name: productObj.name,
-//         slug: productObj.slug,
-//         sku: productObj.sku,
-//         description: productObj.description,
-//         shortDescription: productObj.shortDescription,
-//         category: productObj.category,
-//         subCategory: productObj.subCategory,
-//         status: productObj.status,
-//         featured: productObj.featured,
-//         bestseller: productObj.bestseller,
-//         mainImage: mainImage ? {
-//           url: mainImage.url,
-//           public_id: mainImage.public_id,
-//           isMain: mainImage.isMain
-//         } : null,
-//         colors: colorsDetailed.map(c => c.name),
-//         colorsDetailed: colorsDetailed,
-//         price: mainVariation?.price || 0,
-//         comparePrice: mainVariation?.comparePrice || 0,
-//         priceRange: {
-//           min: minProductPrice,
-//           max: maxProductPrice
-//         },
-//         totalStock: variations.reduce((sum, v) => sum + (v.stock || 0), 0),
-//         matchingAttributes: matchingAttributes,
-//         variationsCount: variations.length,
-//         _debug: {
-//           hasImage: !!mainImage,
-//           hasColors: colorsDetailed.length > 0,
-//           variationsFound: variations.length,
-//           matchingAttributesCount: matchingAttributes.length
-//         }
-//       };
-//     });
-    
-//     // Format categories with full path
-//     const formattedCategories = categories.map(cat => ({
-//       _id: cat._id,
-//       name: cat.name,
-//       slug: cat.slug,
-//       image: cat.image,
-//       level: cat.level,
-//       displayPath: cat.displayPath,  // "Boots Man Shoes"
-//       pathNames: cat.pathNames,      // ["Boots", "Man", "Shoes"]
-//       pathSlugs: cat.pathSlugs,      // ["boots", "man", "shoes"]
-//       type: 'category'
-//     }));
-
-//     const formattedBrands = brands.map(brand => ({
-//       name: brand.name,
-//       count: brand.count,
-//       type: 'brand'
-//     }));
-
-//     res.status(200).json({
-//       success: true,
-//       count: processedProducts.length,
-//       data: processedProducts,
-//       categories: formattedCategories,
-//       brands: formattedBrands,
-//       debug: {
-//         categoriesFound: formattedCategories.length,
-//         brandsFound: formattedBrands.length,
-//         productsFound: processedProducts.length
-//       }
-//     });
-    
-//   } catch (error) {
-//     console.error('Error in searchProducts:', error);
-//     next(error);
-//   }
-// };
 exports.searchProducts = async (req, res, next) => {
   try {
     const { q, category, status, minPrice, maxPrice, limit = 20 } = req.query;
@@ -2107,229 +1733,6 @@ exports.updateVariation = async (req, res, next) => {
 };
 
 // Bulk update variations (to avoid multiple version conflicts)
-// exports.bulkUpdateVariations = async (req, res, next) => {
-//   try {
-//     const { id } = req.params;
-//     const { variations, deletedVariations = [] } = req.body;
-    
-//     const product = await Product.findById(id);
-//     if (!product) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'Product not found'
-//       });
-//     }
-    
-//     // ✅ STEP 1: Update centralized color images
-//     const colorImagesMap = {};
-    
-//     // Collect images from all variations
-//     (variations || []).forEach(variation => {
-//       const colorAttr = variation.attributes?.find(attr => 
-//         attr.name.toLowerCase() === 'color'
-//       );
-      
-//       if (colorAttr && variation.images && variation.images.length > 0) {
-//         const color = colorAttr.value;
-        
-//         if (!colorImagesMap[color]) {
-//           colorImagesMap[color] = {
-//             images: [],
-//             color: color
-//           };
-//         }
-        
-//         // Add unique images for this color
-//         variation.images.forEach(img => {
-//           const exists = colorImagesMap[color].images.some(existingImg => 
-//             existingImg.url === img.url
-//           );
-          
-//           if (!exists) {
-//             colorImagesMap[color].images.push({
-//               url: img.url,
-//               public_id: img.public_id || undefined,
-//               isMain: img.isMain || false,
-//               order: img.order || 0
-//             });
-//           }
-//         });
-//       }
-//     });
-    
-//     // Convert to array for database
-//     const colorImagesArray = Object.values(colorImagesMap).map(colorGroup => ({
-//       color: colorGroup.color,
-//       images: colorGroup.images,
-//       createdBy: req.user?.id || product.createdBy
-//     }));
-    
-//     // Update product's colorImages
-//     product.colorImages = colorImagesArray;
-    
-//     // ✅ STEP 2: Process variations (without images)
-    
-//     // Handle deletions
-//     if (deletedVariations && deletedVariations.length > 0) {
-//       product.variations = product.variations.filter(
-//         v => !deletedVariations.includes(v._id?.toString())
-//       );
-//     }
-    
-//     // Process updates and new variations
-//     if (variations && variations.length > 0) {
-//       const variationsMap = new Map();
-      
-//       // Add all existing variations to map
-//       product.variations.forEach(v => {
-//         const key = generateVariationKey(v.attributes);
-//         variationsMap.set(key, v);
-//       });
-      
-//       // Process incoming variations
-//       variations.forEach(variationData => {
-//         const { _id, images, ...data } = variationData; // Remove images
-        
-//         // Extract color from attributes
-//         const colorAttr = data.attributes?.find(attr => 
-//           attr.name.toLowerCase() === 'color'
-//         );
-        
-//         // Add color field
-//         const variationWithColor = {
-//           ...data,
-//           color: colorAttr?.value
-//         };
-        
-//         const key = generateVariationKey(data.attributes);
-        
-//         if (_id) {
-//           // UPDATE: Find existing variation by _id
-//           const existingIndex = product.variations.findIndex(v => 
-//             v._id.toString() === _id
-//           );
-          
-//           if (existingIndex !== -1) {
-//             // Update existing variation (without images)
-//             product.variations[existingIndex] = {
-//               ...product.variations[existingIndex].toObject(),
-//               ...variationWithColor
-//             };
-//           } else {
-//             // If not found by _id, check by attributes
-//             const existingByAttrs = variationsMap.get(key);
-//             if (existingByAttrs) {
-//               const index = product.variations.findIndex(v => 
-//                 v._id.toString() === existingByAttrs._id.toString()
-//               );
-//               if (index !== -1) {
-//                 product.variations[index] = {
-//                   ...product.variations[index].toObject(),
-//                   ...variationWithColor
-//                 };
-//               }
-//             } else {
-//               // Add as new variation (without images)
-//               product.variations.push(variationWithColor);
-//             }
-//           }
-//         } else {
-//           // NEW: Check if variation with same attributes exists
-//           const existing = variationsMap.get(key);
-//           if (existing) {
-//             // Update existing variation instead of creating new
-//             const index = product.variations.findIndex(v => 
-//               v._id.toString() === existing._id.toString()
-//             );
-//             if (index !== -1) {
-//               product.variations[index] = {
-//                 ...product.variations[index].toObject(),
-//                 ...variationWithColor
-//               };
-//             }
-//           } else {
-//             // Add as new variation (without images)
-//             product.variations.push(variationWithColor);
-//           }
-//         }
-//       });
-//     }
-    
-//     // Ensure only one product main
-//     let productMainFound = false;
-//     product.variations.forEach(v => {
-//       if (v.isMain) {
-//         if (productMainFound) {
-//           v.isMain = false;
-//         } else {
-//           productMainFound = true;
-//         }
-//       }
-//     });
-    
-//     // If no product main found, set first one
-//     if (!productMainFound && product.variations.length > 0) {
-//       product.variations[0].isMain = true;
-//     }
-    
-//     // Ensure each group has only one group main
-//     const groupsMap = new Map();
-//     product.variations.forEach(v => {
-//       const nonColorAttrs = v.attributes?.filter(a => 
-//         a.name.toLowerCase() !== 'color'
-//       );
-//       const groupKey = nonColorAttrs.length > 0 
-//         ? nonColorAttrs.map(a => `${a.name}:${a.value}`).sort().join('|')
-//         : 'no_attributes';
-      
-//       if (!groupsMap.has(groupKey)) {
-//         groupsMap.set(groupKey, []);
-//       }
-//       groupsMap.get(groupKey).push(v);
-//     });
-    
-//     // Reset group mains and set only one per group
-//     groupsMap.forEach((groupVariations, groupKey) => {
-//       let groupMainFound = false;
-//       groupVariations.forEach(v => {
-//         if (groupMainFound) {
-//           v.isGroupMain = false;
-//         } else if (v.isGroupMain) {
-//           groupMainFound = true;
-//         }
-//       });
-      
-//       // If no group main found in this group, set first one
-//       if (!groupMainFound && groupVariations.length > 0) {
-//         const firstVariation = product.variations.find(v => 
-//           v._id.toString() === groupVariations[0]._id.toString()
-//         );
-//         if (firstVariation) {
-//           firstVariation.isGroupMain = true;
-//         }
-//       }
-//     });
-    
-//     await product.save();
-    
-//     // Update category variation values
-//     if (product.category && product.variations.length > 0) {
-//       await updateCategoryVariationValues(product.category, product.variations);
-//     }
-    
-//     // ✅ Get updated product with virtual field
-//     const updatedProduct = await Product.findById(id);
-    
-//     res.status(200).json({
-//       success: true,
-//       message: 'Variations updated successfully',
-//       data: updatedProduct.variationsWithImages
-//     });
-//   } catch (error) {
-//     console.error('Error in bulk update variations:', error);
-//     next(error);
-//   }
-// };
 exports.bulkUpdateVariations = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -2722,62 +2125,6 @@ exports.updateAttributes = async (req, res, next) => {
 };
 
 // Add images to variation
-// exports.addImagesToVariation = async (req, res, next) => {
-//   try {
-//     const { id, variationId } = req.params;
-    
-//     const product = await Product.findById(id);
-//     if (!product) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'Product not found'
-//       });
-//     }
-    
-//     const variation = product.variations.id(variationId);
-//     if (!variation) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'Variation not found'
-//       });
-//     }
-    
-//     // Check if req.files exists
-//     if (!req.files || req.files.length === 0) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'No images provided'
-//       });
-//     }
-    
-//     // ✅ Process uploaded images with URL generation
-//     const images = req.files.map((file, index) => {
-//       // Generate URL for each file
-//       const filePath = file.path || file.filename || `uploads/products/${file.filename}`;
-//       const imageUrl = getFullImageUrl(req, filePath);
-      
-//       return {
-//         url: imageUrl,  // ✅ GENERATED URL
-//         public_id: file.filename || file.key,
-//         isMain: variation.images.length === 0 && index === 0, // First image as main
-//         order: variation.images.length + index
-//       };
-//     });
-    
-//     // Add images to variation
-//     variation.images = [...variation.images, ...images];
-//     await product.save();
-    
-//     res.status(200).json({
-//       success: true,
-//       message: 'Images added to variation successfully',
-//       data: variation.images
-//     });
-//   } catch (error) {
-//     console.error('❌ Error adding images to variation:', error);
-//     next(error);
-//   }
-// };
 exports.addImagesToVariation = async (req, res, next) => {
   try {
     const { id, variationId } = req.params;
@@ -3232,47 +2579,6 @@ exports.getProductDetails = async (req, res, next) => {
 };
 
 // Upload product images
-// exports.uploadProductImages = async (req, res, next) => {
-//   try {
-    
-//     // When using upload.array(), files come directly in req.files
-//     if (!req.files || req.files.length === 0) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'No images provided'
-//       });
-//     }
-    
-//     // ✅ Process uploaded images with URL generation
-//     const uploadedImages = req.files.map(file => {
-//       // Generate URL for each file
-//       const filePath = file.path || file.filename || `uploads/products/${file.filename}`;
-//       const imageUrl = getFullImageUrl(req, filePath);
-      
-//       return {
-//         url: imageUrl,  // ✅ GENERATED URL
-//         public_id: file.filename,
-//         folder: file.folder || 'products',
-//         path: file.path,
-//         size: file.size,
-//         mimetype: file.mimetype
-//       };
-//     });
-    
-//     res.status(200).json({
-//       success: true,
-//       message: 'Images uploaded successfully',
-//       data: {
-//         images: uploadedImages,
-//         count: uploadedImages.length
-//       }
-//     });
-//   } catch (error) {
-//     console.error('❌ Error uploading images:', error);
-//     next(error);
-//   }
-// };
-
 exports.uploadProductImages = async (req, res, next) => {
   try {
     if (!req.files || req.files.length === 0) {
@@ -3416,124 +2722,6 @@ exports.getCategoryBySlug = async (req, res, next) => {
 };
 
 // Get products by category slug
-// exports.getProductsByCategorySlug = async (req, res, next) => {
-//   try {
-//     const { categorySlug } = req.params;
-    
-//     // Find category by slug
-//     const category = await Category.findOne({ slug: categorySlug });
-    
-//     if (!category) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'Category not found'
-//       });
-//     }
-    
-//     // Find products in this category (including subcategories)
-//     const products = await Product.find({ 
-//       category: category._id,
-//       status: 'active'
-//     })
-//       .populate('category', 'name slug')
-//       .populate('subCategory', 'name slug')
-//       .sort('-createdAt')
-//       .limit(50);
-
-//     const processedProducts = products.map(product => {
-//       // ✅ Get variations with images using virtual field
-//       const variationsWithImages = product.variationsWithImages || product.variations || [];
-      
-//       // Find main variation
-//       const mainVariation = variationsWithImages.find(v => v.isMain === true) || variationsWithImages[0];
-      
-//       // ✅ Extract unique colors from all variations WITH THEIR IMAGES
-//       const colorMap = new Map();
-      
-//       variationsWithImages.forEach(variation => {
-//         const colorAttr = variation.attributes?.find(attr => 
-//           attr.name.toLowerCase() === 'color'
-//         );
-        
-//         if (colorAttr) {
-//           const color = colorAttr.value;
-//           if (!colorMap.has(color)) {
-//             colorMap.set(color, {
-//               name: color,
-//               variationIds: [],
-//               count: 0,
-//               images: variation.images || [] // ✅ Get images from variation
-//             });
-//           }
-          
-//           const colorInfo = colorMap.get(color);
-//           colorInfo.variationIds.push(variation._id);
-//           colorInfo.count++;
-//         }
-//       });
-      
-//       // Convert to array
-//       const colorsDetailed = Array.from(colorMap.values());
-
-//       return {
-//         // Return basic product info
-//         _id: product._id,
-//         name: product.name,
-//         slug: product.slug,
-//         sku: product.sku,
-//         description: product.description,
-//         shortDescription: product.shortDescription,
-//         category: product.category,
-//         subCategory: product.subCategory,
-//         status: product.status,
-//         featured: product.featured,
-//         bestseller: product.bestseller,
-        
-//         // ✅ Main variation info WITH IMAGES
-//         mainVariation: mainVariation ? {
-//           _id: mainVariation._id,
-//           sku: mainVariation.sku,
-//           price: mainVariation.price,
-//           comparePrice: mainVariation.comparePrice,
-//           stock: mainVariation.stock,
-//           status: mainVariation.status,
-//           isMain: mainVariation.isMain,
-//           images: mainVariation.images || [], // ✅ Now this will have images
-//           attributes: mainVariation.attributes || []
-//         } : null,
-        
-//         // ✅ Color information WITH IMAGES
-//         allColors: colorsDetailed.map(c => c.name), // Simple array of color names
-//         colorsDetailed: colorsDetailed, // Detailed color info with variation IDs AND IMAGES
-        
-//         // Price range
-//         priceRange: variationsWithImages.length > 0 ? {
-//           min: Math.min(...variationsWithImages.map(v => v.price)),
-//           max: Math.max(...variationsWithImages.map(v => v.price))
-//         } : { min: 0, max: 0 },
-        
-//         // Total stock
-//         totalStock: variationsWithImages.reduce((sum, v) => sum + (v.stock || 0), 0),
-        
-//         // ✅ Store the product object for debugging
-//         _productData: {
-//           variationsCount: product.variations?.length || 0,
-//           colorImagesCount: product.colorImages?.length || 0,
-//           variationsWithImagesCount: variationsWithImages.length
-//         }
-//       };
-//     });
-    
-//     res.status(200).json({
-//       success: true,
-//       data: processedProducts,
-//       category: category
-//     });
-//   } catch (error) {
-//     console.error('Error in getProductsByCategorySlug:', error);
-//     next(error);
-//   }
-// };
 exports.getProductsByCategorySlug = async (req, res, next) => {
   try {
     const { categorySlug } = req.params;
@@ -3820,316 +3008,6 @@ exports.getProductsByCategoryPath = async (req, res, next) => {
 };
 
 // Get products by subcategory slug
-// exports.getProductsBySubCategorySlug = async (req, res, next) => {
-//   try {
-//     const { categorySlug, subCategorySlug } = req.params;
-    
-//     // Find category by slug
-//     const category = await Category.findOne({ slug: categorySlug });
-//     if (!category) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'Category not found'
-//       });
-//     }
-    
-//     // Find subcategory by slug
-//     const subCategory = await Category.findOne({ 
-//       slug: subCategorySlug,
-//       parent: category._id,
-//       status: 'active'
-//     });
-    
-//     if (!subCategory) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'Subcategory not found'
-//       });
-//     }
-    
-//     // Find products in this subcategory
-//     const products = await Product.find({ 
-//       subCategory: subCategory._id,
-//       status: 'active'
-//     })
-//       .populate('category', 'name slug')
-//       .populate('subCategory', 'name slug')
-//       .sort('-createdAt')
-//       .limit(50);
-
-//     // ✅ Process products with ALL attributes
-//     const processedProducts = await Promise.all(products.map(async (product) => {
-//       // Convert to object to access all fields
-//       const productObj = product.toObject();
-      
-//       // ✅ 1. Product level attributes - यही missing है
-//       const productAttributes = productObj.attributes || [];
-      
-//       // ✅ 2. Get variations with images
-//       let variationsWithImages = [];
-      
-//       // Try to use virtual field first
-//       if (product.variationsWithImages && product.variationsWithImages.length > 0) {
-//         variationsWithImages = product.variationsWithImages;
-//       } else {
-//         // Manual merge
-//         variationsWithImages = productObj.variations.map(variation => {
-//           const variationObj = { ...variation };
-          
-//           // Find color in variation attributes
-//           const colorAttr = variationObj.attributes?.find(attr => 
-//             attr.name && attr.name.toLowerCase() === 'color'
-//           );
-          
-//           if (colorAttr && colorAttr.value) {
-//             // Find matching color in colorImages
-//             const colorImageGroup = productObj.colorImages?.find(ci => 
-//               ci.color === colorAttr.value
-//             );
-            
-//             if (colorImageGroup && colorImageGroup.images) {
-//               variationObj.images = colorImageGroup.images;
-//             }
-//           }
-          
-//           return variationObj;
-//         });
-//       }
-      
-//       // ✅ 3. Find main variation
-//       const mainVariation = variationsWithImages.find(v => v.isMain === true) || variationsWithImages[0];
-      
-//       // ✅ 4. Extract colors with images
-//       const colorMap = new Map();
-      
-//       variationsWithImages.forEach(variation => {
-//         const colorAttr = variation.attributes?.find(attr => 
-//           attr.name && attr.name.toLowerCase() === 'color'
-//         );
-        
-//         if (colorAttr && colorAttr.value) {
-//           const color = colorAttr.value;
-          
-//           if (!colorMap.has(color)) {
-//             colorMap.set(color, {
-//               name: color,
-//               variationIds: [],
-//               count: 0,
-//               images: variation.images || []
-//             });
-//           }
-          
-//           const colorInfo = colorMap.get(color);
-//           colorInfo.variationIds.push(variation._id);
-//           colorInfo.count++;
-//         }
-//       });
-      
-//       const colorsDetailed = Array.from(colorMap.values());
-      
-//       // ✅ 5. Price range
-//       const prices = variationsWithImages.map(v => v.price || 0);
-//       const minPrice = Math.min(...prices);
-//       const maxPrice = Math.max(...prices);
-      
-//       // ✅ 6. Return complete product object
-//       return {
-//         // Basic product info
-//         _id: productObj._id,
-//         name: productObj.name,
-//         slug: productObj.slug,
-//         sku: productObj.sku,
-//         description: productObj.description,
-//         shortDescription: productObj.shortDescription,
-//         category: productObj.category,
-//         subCategory: productObj.subCategory,
-//         status: productObj.status,
-//         featured: productObj.featured,
-//         bestseller: productObj.bestseller,
-//         createdAt: productObj.createdAt,
-        
-//         // ✅ IMPORTANT: Product level attributes
-//         attributes: productAttributes,
-        
-//         // ✅ Main variation with images
-//         mainVariation: mainVariation ? {
-//           _id: mainVariation._id,
-//           sku: mainVariation.sku,
-//           price: mainVariation.price,
-//           comparePrice: mainVariation.comparePrice,
-//           stock: mainVariation.stock,
-//           status: mainVariation.status,
-//           isMain: mainVariation.isMain,
-//           images: mainVariation.images || [],
-//           attributes: mainVariation.attributes || []
-//         } : null,
-        
-//         // ✅ Color information
-//         allColors: colorsDetailed.map(c => c.name),
-//         colorsDetailed: colorsDetailed,
-        
-//         // ✅ Price range
-//         priceRange: { min: minPrice, max: maxPrice },
-        
-//         // ✅ Total stock
-//         totalStock: variationsWithImages.reduce((sum, v) => sum + (v.stock || 0), 0),
-        
-//         // ✅ All variations with their attributes
-//         variations: variationsWithImages.map(v => ({
-//           _id: v._id,
-//           sku: v.sku,
-//           price: v.price,
-//           comparePrice: v.comparePrice,
-//           stock: v.stock,
-//           status: v.status,
-//           isMain: v.isMain,
-//           images: v.images || [],
-//           attributes: v.attributes || []  // Variation attributes (size, color etc)
-//         }))
-//       };
-//     }));
-
-//     // ✅ Collect ALL dynamic attributes for filters
-//     const allFilters = {
-//       colors: new Set(),
-//       attributes: {} // Dynamic structure for all attributes
-//     };
-    
-//     // First pass: Collect all unique attribute names
-//     processedProducts.forEach(product => {
-//       // Collect colors
-//       if (product.colorsDetailed) {
-//         product.colorsDetailed.forEach(color => {
-//           if (color.name) allFilters.colors.add(color.name);
-//         });
-//       }
-      
-//       // Collect product level attributes
-//       if (product.attributes) {
-//         product.attributes.forEach(attr => {
-//           if (attr.name && attr.value) {
-//             const attrName = attr.name.toLowerCase();
-//             if (!allFilters.attributes[attrName]) {
-//               allFilters.attributes[attrName] = new Set();
-//             }
-//             allFilters.attributes[attrName].add(attr.value);
-//           }
-//         });
-//       }
-      
-//       // Collect variation level attributes
-//       if (product.variations) {
-//         product.variations.forEach(variation => {
-//           if (variation.attributes) {
-//             variation.attributes.forEach(attr => {
-//               if (attr.name && attr.value && attr.name.toLowerCase() !== 'color') {
-//                 const attrName = attr.name.toLowerCase();
-//                 if (!allFilters.attributes[attrName]) {
-//                   allFilters.attributes[attrName] = new Set();
-//                 }
-//                 allFilters.attributes[attrName].add(attr.value);
-//               }
-//             });
-//           }
-//         });
-//       }
-//     });
-    
-//     // Convert Sets to Arrays with counts
-//     const colorCounts = {};
-//     const attributeCounts = {};
-    
-//     // Count colors
-//     processedProducts.forEach(product => {
-//       if (product.colorsDetailed) {
-//         product.colorsDetailed.forEach(color => {
-//           if (color.name) {
-//             colorCounts[color.name] = (colorCounts[color.name] || 0) + color.count;
-//           }
-//         });
-//       }
-//     });
-    
-//     // Count product level attributes
-//     processedProducts.forEach(product => {
-//       if (product.attributes) {
-//         product.attributes.forEach(attr => {
-//           if (attr.name && attr.value) {
-//             const attrName = attr.name.toLowerCase();
-//             if (!attributeCounts[attrName]) {
-//               attributeCounts[attrName] = {};
-//             }
-//             const attrValue = attr.value.toString();
-//             attributeCounts[attrName][attrValue] = 
-//               (attributeCounts[attrName][attrValue] || 0) + 1;
-//           }
-//         });
-//       }
-//     });
-    
-//     // Count variation attributes
-//     processedProducts.forEach(product => {
-//       if (product.variations) {
-//         product.variations.forEach(variation => {
-//           if (variation.attributes) {
-//             variation.attributes.forEach(attr => {
-//               if (attr.name && attr.value && attr.name.toLowerCase() !== 'color') {
-//                 const attrName = attr.name.toLowerCase();
-//                 if (!attributeCounts[attrName]) {
-//                   attributeCounts[attrName] = {};
-//                 }
-//                 const attrValue = attr.value.toString();
-//                 attributeCounts[attrName][attrValue] = 
-//                   (attributeCounts[attrName][attrValue] || 0) + 1;
-//               }
-//             });
-//           }
-//         });
-//       }
-//     });
-    
-//     // Prepare filters data
-//     const filtersData = {
-//       colors: Array.from(allFilters.colors).map(color => ({
-//         name: color,
-//         count: colorCounts[color] || 1,
-//         colorCode: color
-//       })).sort((a, b) => b.count - a.count),
-      
-//       dynamicAttributes: Object.keys(allFilters.attributes).map(attrName => {
-//         const values = Array.from(allFilters.attributes[attrName] || []);
-//         return {
-//           name: attrName,
-//           displayName: attrName.charAt(0).toUpperCase() + attrName.slice(1),
-//           values: values.map(value => ({
-//             name: value,
-//             count: attributeCounts[attrName]?.[value] || 1
-//           })).sort((a, b) => {
-//             const aNum = parseInt(a.name);
-//             const bNum = parseInt(b.name);
-//             if (!isNaN(aNum) && !isNaN(bNum)) {
-//               return aNum - bNum;
-//             }
-//             return a.name.localeCompare(b.name);
-//           })
-//         };
-//       })
-//     };
-    
-//     res.status(200).json({
-//       success: true,
-//       data: processedProducts,
-//       category: category,
-//       subCategory: subCategory,
-//       filters: filtersData
-//     });
-    
-//   } catch (error) {
-//     console.error('Error in getProductsBySubCategorySlug:', error);
-//     next(error);
-//   }
-// };
-
 exports.getProductsBySubCategorySlug = async (req, res, next) => {
   try {
     const { categorySlug, subCategorySlug } = req.params;
@@ -4487,6 +3365,606 @@ exports.getProductsBySubCategorySlug = async (req, res, next) => {
     
   } catch (error) {
     console.error('Error in getProductsBySubCategorySlug:', error);
+    next(error);
+  }
+};
+
+// Get products by blog type
+exports.getProductsByBlogType = async (req, res, next) => {
+  try {
+    const { blogType } = req.params;
+    
+    // Find all products with matching blog type
+    const products = await Product.find({ 
+      type: blogType,
+      status: 'active'
+    })
+      .populate('category', 'name slug')
+      .populate('subCategory', 'name slug')
+      .sort('-createdAt')
+      .limit(50);
+
+    // Process products to include images and variations
+    const processedProducts = await Promise.all(products.map(async (product) => {
+      const productObj = product.toObject();
+      
+      // Create color to images map from colorImages
+      const colorImageMap = new Map();
+      if (productObj.colorImages && productObj.colorImages.length > 0) {
+        productObj.colorImages.forEach(colorImage => {
+          if (colorImage.color && colorImage.images) {
+            colorImageMap.set(colorImage.color, {
+              images: colorImage.images,
+              color: colorImage.color
+            });
+          }
+        });
+      }
+      
+      // Get variations with images
+      let variationsWithImages = [];
+      
+      if (product.variationsWithImages && product.variationsWithImages.length > 0) {
+        variationsWithImages = product.variationsWithImages.map(variation => {
+          const variationObj = { ...variation };
+          const colorAttr = variationObj.attributes?.find(attr => 
+            attr.name && attr.name.toLowerCase() === 'color'
+          );
+          
+          if (colorAttr && colorAttr.value && (!variationObj.images || variationObj.images.length === 0)) {
+            const colorImageData = colorImageMap.get(colorAttr.value);
+            if (colorImageData) {
+              variationObj.images = colorImageData.images;
+            }
+          }
+          
+          return variationObj;
+        });
+      } else {
+        variationsWithImages = productObj.variations.map(variation => {
+          const variationObj = { ...variation };
+          const colorAttr = variationObj.attributes?.find(attr => 
+            attr.name && attr.name.toLowerCase() === 'color'
+          );
+          
+          if (colorAttr && colorAttr.value) {
+            const colorImageData = colorImageMap.get(colorAttr.value);
+            if (colorImageData && colorImageData.images) {
+              variationObj.images = colorImageData.images;
+            }
+          }
+          
+          return variationObj;
+        });
+      }
+      
+      // Find main variation
+      const mainVariation = variationsWithImages.find(v => v.isMain === true) || variationsWithImages[0];
+      
+      // Extract colors with images
+      const colorMap = new Map();
+      variationsWithImages.forEach(variation => {
+        const colorAttr = variation.attributes?.find(attr => 
+          attr.name && attr.name.toLowerCase() === 'color'
+        );
+        
+        if (colorAttr && colorAttr.value) {
+          const color = colorAttr.value;
+          
+          if (!colorMap.has(color)) {
+            const colorImageData = colorImageMap.get(color);
+            const images = colorImageData ? colorImageData.images : [];
+            
+            colorMap.set(color, {
+              name: color,
+              variationIds: [],
+              count: 0,
+              images: images
+            });
+          }
+          
+          const colorInfo = colorMap.get(color);
+          colorInfo.variationIds.push(variation._id);
+          colorInfo.count++;
+        }
+      });
+      
+      const colorsDetailed = Array.from(colorMap.values());
+      
+      // Price range
+      const prices = variationsWithImages.map(v => v.price || 0);
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+      
+      // Product level attributes
+      const productAttributes = productObj.attributes || [];
+      
+      return {
+        _id: productObj._id,
+        name: productObj.name,
+        slug: productObj.slug,
+        sku: productObj.sku,
+        description: productObj.description,
+        shortDescription: productObj.shortDescription,
+        category: productObj.category,
+        subCategory: productObj.subCategory,
+        type: productObj.type, // Blog category
+        status: productObj.status,
+        featured: productObj.featured,
+        bestseller: productObj.bestseller,
+        createdAt: productObj.createdAt,
+        
+        // Product level attributes
+        attributes: productAttributes,
+        
+        // Main variation with images
+        mainVariation: mainVariation ? {
+          _id: mainVariation._id,
+          sku: mainVariation.sku,
+          price: mainVariation.price,
+          comparePrice: mainVariation.comparePrice,
+          stock: mainVariation.stock,
+          status: mainVariation.status,
+          isMain: mainVariation.isMain,
+          images: mainVariation.images || [],
+          attributes: mainVariation.attributes || []
+        } : null,
+        
+        // Color information with images
+        allColors: colorsDetailed.map(c => c.name),
+        colorsDetailed: colorsDetailed,
+        
+        // Price range
+        priceRange: { min: minPrice, max: maxPrice },
+        
+        // Total stock
+        totalStock: variationsWithImages.reduce((sum, v) => sum + (v.stock || 0), 0),
+        
+        // All variations
+        variations: variationsWithImages.map(v => ({
+          _id: v._id,
+          sku: v.sku,
+          price: v.price,
+          comparePrice: v.comparePrice,
+          stock: v.stock,
+          status: v.status,
+          isMain: v.isMain,
+          images: v.images || [],
+          attributes: v.attributes || []
+        }))
+      };
+    }));
+
+    // Collect filters data
+    const allFilters = {
+      colors: new Set(),
+      attributes: {}
+    };
+    
+    processedProducts.forEach(product => {
+      // Collect colors
+      if (product.colorsDetailed) {
+        product.colorsDetailed.forEach(color => {
+          if (color.name) allFilters.colors.add(color.name);
+        });
+      }
+      
+      // Collect product level attributes
+      if (product.attributes) {
+        product.attributes.forEach(attr => {
+          if (attr.name && attr.value) {
+            const attrName = attr.name.toLowerCase();
+            if (!allFilters.attributes[attrName]) {
+              allFilters.attributes[attrName] = new Set();
+            }
+            allFilters.attributes[attrName].add(attr.value);
+          }
+        });
+      }
+      
+      // Collect variation level attributes
+      if (product.variations) {
+        product.variations.forEach(variation => {
+          if (variation.attributes) {
+            variation.attributes.forEach(attr => {
+              if (attr.name && attr.value && attr.name.toLowerCase() !== 'color') {
+                const attrName = attr.name.toLowerCase();
+                if (!allFilters.attributes[attrName]) {
+                  allFilters.attributes[attrName] = new Set();
+                }
+                allFilters.attributes[attrName].add(attr.value);
+              }
+            });
+          }
+        });
+      }
+    });
+    
+    // Count colors
+    const colorCounts = {};
+    processedProducts.forEach(product => {
+      if (product.colorsDetailed) {
+        product.colorsDetailed.forEach(color => {
+          if (color.name) {
+            colorCounts[color.name] = (colorCounts[color.name] || 0) + color.count;
+          }
+        });
+      }
+    });
+    
+    // Count attributes
+    const attributeCounts = {};
+    processedProducts.forEach(product => {
+      // Product level attributes
+      if (product.attributes) {
+        product.attributes.forEach(attr => {
+          if (attr.name && attr.value) {
+            const attrName = attr.name.toLowerCase();
+            if (!attributeCounts[attrName]) attributeCounts[attrName] = {};
+            const attrValue = attr.value.toString();
+            attributeCounts[attrName][attrValue] = (attributeCounts[attrName][attrValue] || 0) + 1;
+          }
+        });
+      }
+      
+      // Variation attributes
+      if (product.variations) {
+        product.variations.forEach(variation => {
+          if (variation.attributes) {
+            variation.attributes.forEach(attr => {
+              if (attr.name && attr.value && attr.name.toLowerCase() !== 'color') {
+                const attrName = attr.name.toLowerCase();
+                if (!attributeCounts[attrName]) attributeCounts[attrName] = {};
+                const attrValue = attr.value.toString();
+                attributeCounts[attrName][attrValue] = (attributeCounts[attrName][attrValue] || 0) + 1;
+              }
+            });
+          }
+        });
+      }
+    });
+    
+    // Prepare filters data
+    const filtersData = {
+      colors: Array.from(allFilters.colors).map(color => ({
+        name: color,
+        count: colorCounts[color] || 1,
+        colorCode: color
+      })).sort((a, b) => b.count - a.count),
+      
+      dynamicAttributes: Object.keys(allFilters.attributes).map(attrName => {
+        const values = Array.from(allFilters.attributes[attrName] || []);
+        return {
+          name: attrName,
+          displayName: attrName.charAt(0).toUpperCase() + attrName.slice(1),
+          values: values.map(value => ({
+            name: value,
+            count: attributeCounts[attrName]?.[value] || 1
+          })).sort((a, b) => {
+            const aNum = parseInt(a.name);
+            const bNum = parseInt(b.name);
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+              return aNum - bNum;
+            }
+            return a.name.localeCompare(b.name);
+          })
+        };
+      })
+    };
+    
+    res.status(200).json({
+      success: true,
+      data: processedProducts,
+      blogType: blogType,
+      filters: filtersData,
+      total: processedProducts.length
+    });
+    
+  } catch (error) {
+    console.error('Error in getProductsByBlogType:', error);
+    next(error);
+  }
+};
+
+// Get products by brand name
+exports.getProductsByBrand = async (req, res, next) => {
+  try {
+    const { brandName } = req.params;
+    const decodedBrandName = decodeURIComponent(brandName);
+    
+    // Find products where brand attribute matches
+    const products = await Product.find({
+      status: 'active',
+      $or: [
+        // Product level attributes
+        { 'attributes': { $elemMatch: { name: { $regex: /^brand$/i }, value: decodedBrandName } } },
+        // Variation level attributes
+        { 'variations.attributes': { $elemMatch: { name: { $regex: /^brand$/i }, value: decodedBrandName } } }
+      ]
+    })
+      .populate('category', 'name slug')
+      .populate('subCategory', 'name slug')
+      .sort('-createdAt')
+      .limit(100);
+
+    // Process products to include images and variations
+    const processedProducts = await Promise.all(products.map(async (product) => {
+      const productObj = product.toObject();
+      
+      // Create color to images map from colorImages
+      const colorImageMap = new Map();
+      if (productObj.colorImages && productObj.colorImages.length > 0) {
+        productObj.colorImages.forEach(colorImage => {
+          if (colorImage.color && colorImage.images) {
+            colorImageMap.set(colorImage.color, {
+              images: colorImage.images,
+              color: colorImage.color
+            });
+          }
+        });
+      }
+      
+      // Get variations with images
+      let variationsWithImages = [];
+      
+      if (product.variationsWithImages && product.variationsWithImages.length > 0) {
+        variationsWithImages = product.variationsWithImages.map(variation => {
+          const variationObj = { ...variation };
+          const colorAttr = variationObj.attributes?.find(attr => 
+            attr.name && attr.name.toLowerCase() === 'color'
+          );
+          
+          if (colorAttr && colorAttr.value && (!variationObj.images || variationObj.images.length === 0)) {
+            const colorImageData = colorImageMap.get(colorAttr.value);
+            if (colorImageData) {
+              variationObj.images = colorImageData.images;
+            }
+          }
+          
+          return variationObj;
+        });
+      } else {
+        variationsWithImages = productObj.variations.map(variation => {
+          const variationObj = { ...variation };
+          const colorAttr = variationObj.attributes?.find(attr => 
+            attr.name && attr.name.toLowerCase() === 'color'
+          );
+          
+          if (colorAttr && colorAttr.value) {
+            const colorImageData = colorImageMap.get(colorAttr.value);
+            if (colorImageData && colorImageData.images) {
+              variationObj.images = colorImageData.images;
+            }
+          }
+          
+          return variationObj;
+        });
+      }
+      
+      // Find main variation
+      const mainVariation = variationsWithImages.find(v => v.isMain === true) || variationsWithImages[0];
+      
+      // Extract colors with images
+      const colorMap = new Map();
+      variationsWithImages.forEach(variation => {
+        const colorAttr = variation.attributes?.find(attr => 
+          attr.name && attr.name.toLowerCase() === 'color'
+        );
+        
+        if (colorAttr && colorAttr.value) {
+          const color = colorAttr.value;
+          
+          if (!colorMap.has(color)) {
+            const colorImageData = colorImageMap.get(color);
+            const images = colorImageData ? colorImageData.images : [];
+            
+            colorMap.set(color, {
+              name: color,
+              variationIds: [],
+              count: 0,
+              images: images
+            });
+          }
+          
+          const colorInfo = colorMap.get(color);
+          colorInfo.variationIds.push(variation._id);
+          colorInfo.count++;
+        }
+      });
+      
+      const colorsDetailed = Array.from(colorMap.values());
+      
+      // Price range
+      const prices = variationsWithImages.map(v => v.price || 0);
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+      
+      // Product level attributes
+      const productAttributes = productObj.attributes || [];
+      
+      return {
+        _id: productObj._id,
+        name: productObj.name,
+        slug: productObj.slug,
+        sku: productObj.sku,
+        description: productObj.description,
+        shortDescription: productObj.shortDescription,
+        category: productObj.category,
+        subCategory: productObj.subCategory,
+        type: productObj.type,
+        status: productObj.status,
+        featured: productObj.featured,
+        bestseller: productObj.bestseller,
+        createdAt: productObj.createdAt,
+        
+        // Product level attributes
+        attributes: productAttributes,
+        
+        // Main variation with images
+        mainVariation: mainVariation ? {
+          _id: mainVariation._id,
+          sku: mainVariation.sku,
+          price: mainVariation.price,
+          comparePrice: mainVariation.comparePrice,
+          stock: mainVariation.stock,
+          status: mainVariation.status,
+          isMain: mainVariation.isMain,
+          images: mainVariation.images || [],
+          attributes: mainVariation.attributes || []
+        } : null,
+        
+        // Color information with images
+        allColors: colorsDetailed.map(c => c.name),
+        colorsDetailed: colorsDetailed,
+        
+        // Price range
+        priceRange: { min: minPrice, max: maxPrice },
+        
+        // Total stock
+        totalStock: variationsWithImages.reduce((sum, v) => sum + (v.stock || 0), 0),
+        
+        // All variations
+        variations: variationsWithImages.map(v => ({
+          _id: v._id,
+          sku: v.sku,
+          price: v.price,
+          comparePrice: v.comparePrice,
+          stock: v.stock,
+          status: v.status,
+          isMain: v.isMain,
+          images: v.images || [],
+          attributes: v.attributes || []
+        }))
+      };
+    }));
+
+    // Collect filters data
+    const allFilters = {
+      colors: new Set(),
+      attributes: {}
+    };
+    
+    processedProducts.forEach(product => {
+      // Collect colors
+      if (product.colorsDetailed) {
+        product.colorsDetailed.forEach(color => {
+          if (color.name) allFilters.colors.add(color.name);
+        });
+      }
+      
+      // Collect product level attributes
+      if (product.attributes) {
+        product.attributes.forEach(attr => {
+          if (attr.name && attr.value && attr.name.toLowerCase() !== 'brand') {
+            const attrName = attr.name.toLowerCase();
+            if (!allFilters.attributes[attrName]) {
+              allFilters.attributes[attrName] = new Set();
+            }
+            allFilters.attributes[attrName].add(attr.value);
+          }
+        });
+      }
+      
+      // Collect variation level attributes
+      if (product.variations) {
+        product.variations.forEach(variation => {
+          if (variation.attributes) {
+            variation.attributes.forEach(attr => {
+              if (attr.name && attr.value && attr.name.toLowerCase() !== 'color' && attr.name.toLowerCase() !== 'brand') {
+                const attrName = attr.name.toLowerCase();
+                if (!allFilters.attributes[attrName]) {
+                  allFilters.attributes[attrName] = new Set();
+                }
+                allFilters.attributes[attrName].add(attr.value);
+              }
+            });
+          }
+        });
+      }
+    });
+    
+    // Count colors
+    const colorCounts = {};
+    processedProducts.forEach(product => {
+      if (product.colorsDetailed) {
+        product.colorsDetailed.forEach(color => {
+          if (color.name) {
+            colorCounts[color.name] = (colorCounts[color.name] || 0) + color.count;
+          }
+        });
+      }
+    });
+    
+    // Count attributes
+    const attributeCounts = {};
+    processedProducts.forEach(product => {
+      // Product level attributes
+      if (product.attributes) {
+        product.attributes.forEach(attr => {
+          if (attr.name && attr.value && attr.name.toLowerCase() !== 'brand') {
+            const attrName = attr.name.toLowerCase();
+            if (!attributeCounts[attrName]) attributeCounts[attrName] = {};
+            const attrValue = attr.value.toString();
+            attributeCounts[attrName][attrValue] = (attributeCounts[attrName][attrValue] || 0) + 1;
+          }
+        });
+      }
+      
+      // Variation attributes
+      if (product.variations) {
+        product.variations.forEach(variation => {
+          if (variation.attributes) {
+            variation.attributes.forEach(attr => {
+              if (attr.name && attr.value && attr.name.toLowerCase() !== 'color' && attr.name.toLowerCase() !== 'brand') {
+                const attrName = attr.name.toLowerCase();
+                if (!attributeCounts[attrName]) attributeCounts[attrName] = {};
+                const attrValue = attr.value.toString();
+                attributeCounts[attrName][attrValue] = (attributeCounts[attrName][attrValue] || 0) + 1;
+              }
+            });
+          }
+        });
+      }
+    });
+    
+    // Prepare filters data
+    const filtersData = {
+      colors: Array.from(allFilters.colors).map(color => ({
+        name: color,
+        count: colorCounts[color] || 1,
+        colorCode: color
+      })).sort((a, b) => b.count - a.count),
+      
+      dynamicAttributes: Object.keys(allFilters.attributes).map(attrName => {
+        const values = Array.from(allFilters.attributes[attrName] || []);
+        return {
+          name: attrName,
+          displayName: attrName.charAt(0).toUpperCase() + attrName.slice(1),
+          values: values.map(value => ({
+            name: value,
+            count: attributeCounts[attrName]?.[value] || 1
+          })).sort((a, b) => {
+            const aNum = parseInt(a.name);
+            const bNum = parseInt(b.name);
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+              return aNum - bNum;
+            }
+            return a.name.localeCompare(b.name);
+          })
+        };
+      })
+    };
+    
+    res.status(200).json({
+      success: true,
+      data: processedProducts,
+      brandName: decodedBrandName,
+      filters: filtersData,
+      total: processedProducts.length
+    });
+    
+  } catch (error) {
+    console.error('Error in getProductsByBrand:', error);
     next(error);
   }
 };
