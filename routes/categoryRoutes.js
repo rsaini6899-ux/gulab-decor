@@ -41,9 +41,7 @@ router.get('/hierarchy/all', categoryController.getCategoriesHierarchy);
 
 
 router.put('/:id',
-  // upload.single('image'),
   cloudinaryUpload('categories').single('image'),
-  // upload.processImage('categories'),
   processCloudinaryResponse,
   categoryController.updateCategory
 );
