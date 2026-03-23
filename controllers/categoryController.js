@@ -657,10 +657,191 @@ exports.deleteCategory = async (req, res, next) => {
 };
 
 // Update category
+// exports.updateCategory = async (req, res, next) => {
+//   try {
+//     const categoryId = req.params.id;
+//     const updateData = { ...req.body };
+    
+//     let category = await Category.findById(categoryId);
+    
+//     if (!category) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Category not found'
+//       });
+//     }
+    
+//     // ✅ Handle main category image
+//     if (req.file) {
+//       updateData.image = req.file.fullUrl || getFullImageUrl(req, req.file.path);
+//       console.log('Updating main category image URL:', updateData.image);
+//     } else if (updateData.imageUrl) {
+//       updateData.image = updateData.imageUrl;
+//     } else if (updateData.image) {
+//       if (typeof updateData.image === 'object') {
+//         updateData.image = updateData.image.url || updateData.image;
+//       }
+//     }
+    
+//     // ✅ Update basic fields
+//     const basicFields = ['name', 'slug', 'description', 'status', 'featured', 'image'];
+//     basicFields.forEach(field => {
+//       if (updateData[field] !== undefined) {
+//         category[field] = updateData[field];
+//       }
+//     });
+    
+//     // ✅ **FIXED: Handle children categories with proper image handling**
+//     if (updateData.children && Array.isArray(updateData.children)) {
+      
+//       // Recursive function to update/create children
+//       const updateChildren = async (parentId, children, level = 1) => {
+//         const updatedChildrenIds = [];
+        
+//         for (const childData of children) {
+//           // ✅ Extract image URL properly
+//           let imageUrl = null;
+          
+//           // Check multiple possible image sources
+//           if (childData.imageUrl && !childData.imageUrl.startsWith('blob:')) {
+//             imageUrl = childData.imageUrl;
+//             console.log(`Found imageUrl: ${imageUrl}`);
+//           } else if (childData.image && !childData.image.startsWith('blob:')) {
+//             imageUrl = childData.image;
+//             console.log(`Found image field: ${imageUrl}`);
+//           } else if (childData.image && typeof childData.image === 'object' && childData.image.url) {
+//             imageUrl = childData.image.url;
+//             console.log(`Found image.url: ${imageUrl}`);
+//           }
+          
+//           // Check if child already exists (has real MongoDB ID)
+//           const isRealId = childData._id && 
+//                           !childData._id.toString().startsWith('temp_') && 
+//                           childData._id.toString().length === 24;
+          
+//           if (isRealId) {
+//             // ✅ UPDATE EXISTING CHILD (This includes Level 1 children)
+//             let childCategory = await Category.findById(childData._id);
+            
+//             if (childCategory) {
+//               console.log(`Updating existing child: ${childData.name} (Level ${level})`);
+              
+//               // Update child fields
+//               childCategory.name = childData.name || childCategory.name;
+//               childCategory.slug = childData.slug || childCategory.slug;
+//               childCategory.description = childData.description || childCategory.description;
+//               childCategory.status = childData.status || childCategory.status;
+//               childCategory.featured = childData.featured || childCategory.featured;
+//               childCategory.parent = parentId;
+//               childCategory.level = level;
+              
+//               // ✅ CRITICAL FIX: Update image if provided (works for Level 1 and above)
+//               if (imageUrl) {
+//                 console.log(`✅ Setting image for "${childData.name}": ${imageUrl}`);
+//                 childCategory.image = imageUrl;
+//               } else {
+//                 console.log(`⚠️ No image URL found for "${childData.name}"`);
+//               }
+              
+//               await childCategory.save();
+//               updatedChildrenIds.push(childCategory._id);
+              
+//               // ✅ Recursively update grandchildren (Level 2+)
+//               if (childData.children && childData.children.length > 0) {
+//                 await updateChildren(childCategory._id, childData.children, level + 1);
+//               }
+//             } else {
+//               console.log(`❌ Child not found with ID: ${childData._id}`);
+//             }
+//           } else {
+//             // ✅ CREATE NEW CHILD
+//             const slug = childData.slug || childData.name.toLowerCase()
+//               .replace(/[^a-zA-Z0-9]/g, '-')
+//               .replace(/-+/g, '-');
+            
+//             const newChildData = {
+//               name: childData.name,
+//               slug: slug,
+//               description: childData.description || '',
+//               status: childData.status || 'active',
+//               featured: childData.featured || false,
+//               parent: parentId,
+//               level: level
+//             };
+            
+//             // ✅ Add image if available
+//             if (imageUrl) {
+//               console.log(`Creating new child "${childData.name}" with image:`, imageUrl);
+//               newChildData.image = imageUrl;
+//             }
+            
+//             const newChild = await Category.create(newChildData);
+//             updatedChildrenIds.push(newChild._id);
+            
+//             // ✅ Recursively create grandchildren
+//             if (childData.children && childData.children.length > 0) {
+//               await updateChildren(newChild._id, childData.children, level + 1);
+//             }
+//           }
+//         }
+        
+//         // ✅ Remove children that are not in the update list
+//         const deleted = await Category.deleteMany({
+//           parent: parentId,
+//           _id: { $nin: updatedChildrenIds }
+//         });
+        
+//         if (deleted.deletedCount > 0) {
+//           console.log(`Removed ${deleted.deletedCount} orphaned children from parent ${parentId}`);
+//         }
+//       };
+      
+//       // Start recursive update from current category
+//       console.log(`Starting update for main category: ${category.name}`);
+//       await updateChildren(category._id, updateData.children, 1);
+//     }
+    
+//     // ✅ Save main category
+//     await category.save();
+    
+//     // ✅ Fetch updated category with all children
+//     const updatedCategory = await Category.findById(categoryId)
+//       .populate({
+//         path: 'children',
+//         populate: { path: 'children' }
+//       });
+    
+//     console.log('✅ Update completed successfully');
+    
+//     res.status(200).json({
+//       success: true,
+//       message: 'Category and all children updated successfully',
+//       data: updatedCategory
+//     });
+    
+//   } catch (error) {
+//     console.error('❌ Error in updateCategory:', error);
+    
+//     if (error.code === 11000) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Category with same name already exists under this parent'
+//       });
+//     }
+    
+//     res.status(500).json({
+//       success: false,
+//       message: error.message || 'Server error'
+//     });
+//   }
+// };
 exports.updateCategory = async (req, res, next) => {
   try {
     const categoryId = req.params.id;
-    const updateData = { ...req.body }; // Clone karo
+    const updateData = { ...req.body };
+    
+    console.log('📥 Received update for category ID:', categoryId);
+    console.log('📦 Update data:', JSON.stringify(updateData, null, 2));
     
     let category = await Category.findById(categoryId);
     
@@ -671,121 +852,166 @@ exports.updateCategory = async (req, res, next) => {
       });
     }
     
-    // ✅ Handle image - STRING store karo
-    if (req.file) {
-      updateData.image = req.file.fullUrl || getFullImageUrl(req, req.file.path);
-      console.log('Updating with image URL:', updateData.image);
-    } else if (req.body.imageUrl) {
-      updateData.image = req.body.imageUrl;
-    } else if (req.body.image) {
-      if (typeof req.body.image === 'object') {
-        updateData.image = req.body.image.url || req.body.image;
-      }
+    // ✅ STEP 1: Update the main category's OWN data (including its image)
+    console.log('\n🔧 Updating main category...');
+    
+    // Extract main category image
+    let mainImageUrl = null;
+    if (updateData.imageUrl && !updateData.imageUrl.startsWith('blob:')) {
+      mainImageUrl = updateData.imageUrl;
+    } else if (updateData.image && !updateData.image.startsWith('blob:')) {
+      mainImageUrl = updateData.image;
     }
     
-    // ✅ Update basic fields
-    const basicFields = ['name', 'slug', 'description', 'status', 'featured', 'image'];
-    basicFields.forEach(field => {
-      if (updateData[field] !== undefined) {
-        category[field] = updateData[field];
-      }
-    });
+    // Update main category fields
+    if (updateData.name) category.name = updateData.name.trim();
+    if (updateData.slug) category.slug = updateData.slug;
+    if (updateData.description !== undefined) category.description = updateData.description;
+    if (updateData.status) category.status = updateData.status;
+    if (updateData.featured !== undefined) category.featured = updateData.featured;
     
-    // ✅ **IMPORTANT: Handle children categories (subCategories)**
+    // ✅ CRITICAL: Update main category's image
+    if (mainImageUrl) {
+      console.log(`🖼️ Updating main category "${category.name}" image to:`, mainImageUrl);
+      category.image = mainImageUrl;
+    } else {
+      console.log(`⚠️ No new image for main category "${category.name}"`);
+    }
+    
+    await category.save();
+    console.log(`✅ Main category "${category.name}" updated with image: ${category.image || 'none'}`);
+    
+    // ✅ STEP 2: Process children categories
     if (updateData.children && Array.isArray(updateData.children)) {
+      console.log(`\n👥 Processing ${updateData.children.length} children...`);
       
-      // Recursive function to update/create children
-      const updateChildren = async (parentId, children, level = 1) => {
-        const updatedChildrenIds = [];
+      const updateOrCreateChild = async (childData, parentId, level) => {
+        console.log(`\n📌 Processing child: ${childData.name} (Level ${level})`);
         
-        for (const childData of children) {
-          // Check if child already exists (has _id)
-          if (childData._id) {
-            // ✅ UPDATE EXISTING CHILD
-            let childCategory = await Category.findById(childData._id);
-            
-            if (childCategory) {
-              // Update child fields
-              childCategory.name = childData.name || childCategory.name;
-              childCategory.slug = childData.slug || childCategory.slug;
-              childCategory.description = childData.description || childCategory.description;
-              childCategory.status = childData.status || childCategory.status;
-              childCategory.featured = childData.featured || childCategory.featured;
-              childCategory.parent = parentId;
-              childCategory.level = level;
-              
-              // Handle child image
-              if (childData.imageUrl) {
-                childCategory.image = childData.imageUrl;
-              } else if (childData.image) {
-                childCategory.image = typeof childData.image === 'object' 
-                  ? childData.image.url 
-                  : childData.image;
-              }
-              
-              await childCategory.save();
-              updatedChildrenIds.push(childCategory._id);
-              
-              // ✅ Recursively update grandchildren
-              if (childData.children && childData.children.length > 0) {
-                await updateChildren(childCategory._id, childData.children, level + 1);
-              }
-            }
-          } else {
-            // ✅ CREATE NEW CHILD
-            const newChild = await Category.create({
-              name: childData.name,
-              slug: childData.slug || childData.name.toLowerCase()
-                .replace(/[^a-zA-Z0-9]/g, '-')
-                .replace(/-+/g, '-'),
-              description: childData.description || '',
-              status: childData.status || 'active',
-              featured: childData.featured || false,
-              image: childData.imageUrl || (typeof childData.image === 'object' 
-                ? childData.image.url 
-                : childData.image),
-              parent: parentId,
-              level: level
-            });
-            
-            updatedChildrenIds.push(newChild._id);
-            
-            // ✅ Recursively create grandchildren
-            if (childData.children && childData.children.length > 0) {
-              await updateChildren(newChild._id, childData.children, level + 1);
-            }
-          }
+        // Extract child's image
+        let childImageUrl = null;
+        if (childData.imageUrl && !childData.imageUrl.startsWith('blob:')) {
+          childImageUrl = childData.imageUrl;
+        } else if (childData.image && !childData.image.startsWith('blob:')) {
+          childImageUrl = childData.image;
         }
         
-        // ✅ Remove children that are not in the update list
-        await Category.deleteMany({
-          parent: parentId,
-          _id: { $nin: updatedChildrenIds }
-        });
+        // Check if child exists
+        const isRealId = childData._id && 
+                         !childData._id.toString().startsWith('temp_') && 
+                         childData._id.toString().length === 24;
+        
+        let childCategory = null;
+        
+        if (isRealId) {
+          // Update existing child
+          childCategory = await Category.findById(childData._id);
+          
+          if (childCategory) {
+            console.log(`📝 Updating existing child: ${childData.name}`);
+            
+            // Update fields
+            if (childData.name) childCategory.name = childData.name.trim();
+            if (childData.slug) childCategory.slug = childData.slug;
+            if (childData.description !== undefined) childCategory.description = childData.description;
+            if (childData.status) childCategory.status = childData.status;
+            if (childData.featured !== undefined) childCategory.featured = childData.featured;
+            childCategory.parent = parentId;
+            childCategory.level = level;
+            
+            // ✅ Update child's image
+            if (childImageUrl) {
+              console.log(`🖼️ Updating child "${childData.name}" image to:`, childImageUrl);
+              childCategory.image = childImageUrl;
+            }
+            
+            await childCategory.save();
+            console.log(`✅ Updated child "${childData.name}" with image: ${childCategory.image || 'none'}`);
+          }
+        } else {
+          // Create new child
+          console.log(`🆕 Creating new child: ${childData.name}`);
+          
+          const slug = childData.slug || childData.name.toLowerCase()
+            .replace(/[^a-zA-Z0-9]/g, '-')
+            .replace(/-+/g, '-');
+          
+          const newChildData = {
+            name: childData.name.trim(),
+            slug: slug,
+            description: childData.description || '',
+            status: childData.status || 'active',
+            featured: childData.featured || false,
+            parent: parentId,
+            level: level
+          };
+          
+          if (childImageUrl) {
+            console.log(`🖼️ Creating child "${childData.name}" with image:`, childImageUrl);
+            newChildData.image = childImageUrl;
+          }
+          
+          childCategory = await Category.create(newChildData);
+          console.log(`✅ Created child "${childData.name}" with ID: ${childCategory._id}`);
+        }
+        
+        // Process grandchildren recursively
+        if (childCategory && childData.children && childData.children.length > 0) {
+          const grandChildIds = [];
+          
+          for (const grandChild of childData.children) {
+            const updatedGrandChild = await updateOrCreateChild(grandChild, childCategory._id, level + 1);
+            if (updatedGrandChild) {
+              grandChildIds.push(updatedGrandChild._id);
+            }
+          }
+          
+          // Remove orphaned grandchildren
+          await Category.deleteMany({
+            parent: childCategory._id,
+            _id: { $nin: grandChildIds }
+          });
+        }
+        
+        return childCategory;
       };
       
-      // Start recursive update from current category
-      await updateChildren(category._id, updateData.children, 1);
+      const updatedChildIds = [];
+      
+      for (const child of updateData.children) {
+        const updatedChild = await updateOrCreateChild(child, category._id, 1);
+        if (updatedChild) {
+          updatedChildIds.push(updatedChild._id);
+        }
+      }
+      
+      // Remove children that are not in the update list
+      await Category.deleteMany({
+        parent: category._id,
+        _id: { $nin: updatedChildIds }
+      });
+      
+      console.log(`\n✅ Processed ${updatedChildIds.length} children`);
     }
     
-    // ✅ Save main category
-    await category.save();
-    
-    // ✅ Fetch updated category with all children
-    const updatedCategory = await Category.findById(categoryId)
+    // ✅ Fetch final updated category with all children
+    const finalCategory = await Category.findById(categoryId)
       .populate({
         path: 'children',
-        populate: { path: 'children' }
+        populate: { path: 'children', populate: { path: 'children' } }
       });
+    
+    console.log('\n🎉 Update completed successfully!');
+    console.log('Final category image:', finalCategory.image);
     
     res.status(200).json({
       success: true,
-      message: 'Category and all children updated successfully',
-      data: updatedCategory
+      message: 'Category updated successfully',
+      data: finalCategory
     });
     
   } catch (error) {
-    console.error('❌ Error:', error);
+    console.error('❌ Error in updateCategory:', error);
     
     if (error.code === 11000) {
       return res.status(400).json({
