@@ -33,7 +33,7 @@ router.get('/:parentId/children', categoryController.getChildCategories);
 router.get('/slug/:slug', categoryController.getCategoryBySlug);
 router.get('/level/:level', categoryController.getCategoriesByLevel);
 
-// Get category with all children (nested)
+// Get category with all children
 router.get('/:categoryId/with-children', categoryController.getCategoryWithChildren);
 
 // Get all categories with hierarchy (for dropdowns)

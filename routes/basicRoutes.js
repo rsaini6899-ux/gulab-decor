@@ -23,26 +23,14 @@ router.patch('/social', authMiddleware, updateSocialMedia);
 router.patch('/features', authMiddleware, updateFeatures);
 router.patch('/footer-settings', authMiddleware, updateFooterSettings);
 
-// router.post(
-//   '/upload-logos',
-//   authMiddleware,
-//   cloudinaryUpload('logos').fields([
-//     { name: 'headerLogo', maxCount: 1 },
-//     { name: 'footerLogo', maxCount: 1 }
-//   ]),
-//   processCloudinaryResponse,
-//   uploadLogos
-// );
-
-// routes/basicRoutes.js - FINAL VERSION
 router.post(
   '/upload-logos',
   authMiddleware,
   cloudinaryUpload('logos').fields([
-    { name: 'logo', maxCount: 1 },           // For single logo upload
-    { name: 'headerLogo', maxCount: 1 },      // For header specifically
-    { name: 'footerLogo', maxCount: 1 },       // For footer specifically
-    { name: 'image', maxCount: 1 }             // Common field name
+    { name: 'logo', maxCount: 1 },         
+    { name: 'headerLogo', maxCount: 1 },     
+    { name: 'footerLogo', maxCount: 1 },      
+    { name: 'image', maxCount: 1 }             
   ]),
   processCloudinaryResponse,
   uploadLogos

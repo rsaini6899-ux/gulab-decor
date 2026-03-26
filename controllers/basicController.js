@@ -19,15 +19,50 @@ exports.getBasicInfo = async (req, res) => {
 };
 
 // @access  Private/Admin
+// exports.updateBasicInfo = async (req, res) => {
+//   try {
+//     const basic = await Basic.getSingleton();
+    
+//     // Update fields
+//     const updatableFields = [
+//       'companyName', 'tagline', 'logo', 'description',
+//       'address', 'phone', 'email', 'socialMedia',
+//       'features', 'copyright', 'footerSettings', 'appVersion'
+//     ];
+    
+//     updatableFields.forEach(field => {
+//       if (req.body[field] !== undefined) {
+//         basic[field] = req.body[field];
+//       }
+//     });
+    
+//     await basic.save();
+    
+//     res.json({
+//       success: true,
+//       message: 'Basic information updated successfully',
+//       data: basic
+//     });
+//   } catch (error) {
+//     console.error('Error updating basic info:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Error updating basic information',
+//       error: error.message
+//     });
+//   }
+// };
+// controllers/basicController.js - Update to handle primaryColor
+
 exports.updateBasicInfo = async (req, res) => {
   try {
     const basic = await Basic.getSingleton();
     
-    // Update fields
+    // Update fields including primaryColor
     const updatableFields = [
-      'companyName', 'tagline', 'logo', 'description',
-      'address', 'phone', 'email', 'socialMedia',
-      'features', 'copyright', 'footerSettings', 'appVersion'
+      'companyName', 'tagline', 'description', 'headerLogo', 'footerLogo',
+      'address', 'phone', 'email', 'socialMedia', 'features', 
+      'copyright', 'footerSettings', 'appVersion', 'primaryColor' // Add this
     ];
     
     updatableFields.forEach(field => {
@@ -140,54 +175,7 @@ exports.updateFooterSettings = async (req, res) => {
 };
 
 
-// @route   POST /api/basic/upload-logo
-// exports.uploadLogos = async (req, res, next) => {
-//   try {
-//     const basic = await Basic.getSingleton();
-//     const updates = {};
-    
-//     console.log('📸 Uploaded files:', req.files);
-    
-//     // ✅ Check for header logo
-//     if (req.files && req.files.headerLogo && req.files.headerLogo.length > 0) {
-//       const headerFile = req.files.headerLogo[0];
-//       updates.headerLogo = headerFile.fullUrl || headerFile.path;
-//       console.log('✅ Header logo uploaded:', updates.headerLogo);
-//     }
-    
-//     // ✅ Check for footer logo
-//     if (req.files && req.files.footerLogo && req.files.footerLogo.length > 0) {
-//       const footerFile = req.files.footerLogo[0];
-//       updates.footerLogo = footerFile.fullUrl || footerFile.path;
-//       console.log('✅ Footer logo uploaded:', updates.footerLogo);
-//     }
-    
-//     // Agar koi file nahi aayi
-//     if (Object.keys(updates).length === 0) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'No logo files uploaded. Send headerLogo or footerLogo field.'
-//       });
-//     }
-    
-//     // Update basic info
-//     Object.assign(basic, updates);
-//     await basic.save();
-    
-//     res.status(200).json({
-//       success: true,
-//       message: 'Logos uploaded successfully',
-//       data: {
-//         headerLogo: basic.headerLogo,
-//         footerLogo: basic.footerLogo
-//       }
-//     });
-    
-//   } catch (error) {
-//     console.error('❌ Logo upload error:', error);
-//     next(error);
-//   }
-// };
+// POST /api/basic/upload-logo
 exports.uploadLogos = async (req, res, next) => {
   try {
     const basic = await Basic.getSingleton();

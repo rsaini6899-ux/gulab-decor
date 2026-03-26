@@ -83,6 +83,10 @@ const basicSchema = new mongoose.Schema({
   appVersion: {
     type: String,
     default: '27.0 (801)'
+  },
+   primaryColor: {
+    type: String,
+    default: '#f59e0b',
   }
 }, {
   timestamps: true
@@ -105,6 +109,35 @@ basicSchema.statics.getSingleton = async function() {
     basic = await this.create({});
   }
   return basic;
+};
+
+// Helper method to get color with opacity variations
+basicSchema.methods.getColorVariants = function() {
+  const color = this.primaryColor;
+  return {
+    base: color,
+    light: this.adjustBrightness(color, 30),  // 30% lighter
+    dark: this.adjustBrightness(color, -20),  // 20% darker
+    border: color,
+    bg: this.adjustBrightness(color, 85),     // Very light for background
+    text: color
+  };
+};
+
+// Helper function to adjust brightness
+basicSchema.methods.adjustBrightness = function(hex, percent) {
+  // Convert hex to RGB
+  let r = parseInt(hex.slice(1,3), 16);
+  let g = parseInt(hex.slice(3,5), 16);
+  let b = parseInt(hex.slice(5,7), 16);
+  
+  // Adjust brightness
+  r = Math.min(255, Math.max(0, r + (r * percent / 100)));
+  g = Math.min(255, Math.max(0, g + (g * percent / 100)));
+  b = Math.min(255, Math.max(0, b + (b * percent / 100)));
+  
+  // Convert back to hex
+  return `#${Math.round(r).toString(16).padStart(2,'0')}${Math.round(g).toString(16).padStart(2,'0')}${Math.round(b).toString(16).padStart(2,'0')}`;
 };
 
 module.exports = mongoose.model('Basic', basicSchema);

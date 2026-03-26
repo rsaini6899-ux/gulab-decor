@@ -178,7 +178,6 @@ exports.getOnlyFeaturedCategories = async (req, res, next) => {
       id: category._id,
       name: category.name,
       slug: category.slug,
-      // description: category.description,
       image: category.image,
       // status: category.status,
       // featured: category.featured,
