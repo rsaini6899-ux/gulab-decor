@@ -49,6 +49,7 @@ router.put('/:id',
 router.delete('/:id', categoryController.deleteCategory);
 
 router.post('/batch', categoryController.createMultipleCategories);
+router.post('/', categoryController.createCategory);
 
 
 module.exports = router;
