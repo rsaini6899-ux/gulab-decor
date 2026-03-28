@@ -489,8 +489,8 @@ exports.createCODOrder = async (req, res) => {
       default: shipping = 99;
     }
 
-    const tax = Math.round(subtotal * 0.18);
-    let total = subtotal + shipping + tax;
+    // const tax = Math.round(subtotal * 0.18);
+    let total = subtotal + shipping;
     
     // Apply coupon
     let appliedCoupon = null;
@@ -573,7 +573,7 @@ exports.createCODOrder = async (req, res) => {
       shippingMethod,
       subtotal,
       shipping,
-      tax,
+      // tax,
       total,
       couponCode: appliedCoupon?.code || null,
       discountAmount: finalDiscountAmount,
@@ -712,7 +712,7 @@ exports.createCODOrder = async (req, res) => {
       })),
       subtotal: order.subtotal,
       shipping: order.shipping,
-      tax: order.tax,
+      // tax: order.tax,
       couponCode: order.couponCode,
       discountAmount: order.discountAmount,
       total: order.total,
@@ -889,8 +889,8 @@ exports.createRazorpayOrder = async (req, res) => {
       default: shipping = 99;
     }
 
-    const tax = Math.round(subtotal * 0.18);
-    let total = subtotal + shipping + tax;
+    // const tax = Math.round(subtotal * 0.18);
+    let total = subtotal + shipping;
     
     let appliedCoupon = null;
     let finalDiscountAmount = 0;
@@ -959,7 +959,7 @@ exports.createRazorpayOrder = async (req, res) => {
       shippingMethod,
       subtotal,
       shipping,
-      tax,
+      // tax,
       total,
       couponCode: appliedCoupon?.code || null,
       discountAmount: finalDiscountAmount,
@@ -2903,10 +2903,10 @@ exports.createOrder = async (req, res, next) => {
     }
     
     // Calculate totals
-    const tax = orderData.tax || (subtotal * 0.08); // 8% default tax
+    // const tax = orderData.tax || (subtotal * 0.08);
     const shipping = orderData.shipping || 0;
     const discount = orderData.discount || 0;
-    const total = subtotal + shipping + tax - discount;
+    const total = subtotal + shipping - discount;
     
     // Create order
     const order = await Order.create({
@@ -2915,7 +2915,7 @@ exports.createOrder = async (req, res, next) => {
       items: preparedItems,
       subtotal,
       shipping,
-      tax,
+      // tax,
       discount,
       total,
       createdBy: req.user.id

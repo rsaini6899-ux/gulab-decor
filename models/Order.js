@@ -143,7 +143,7 @@ const orderSchema = new mongoose.Schema(
     },
     tax: {
       type: Number,
-      required: true,
+      // required: true,
       min: 0,
       default: 0,
     },
@@ -265,7 +265,7 @@ orderSchema.pre("save", function (next) {
   }, 0);
 
   this.subtotal = itemsTotal;
-  this.total = this.subtotal + this.shipping + this.tax - this.discount;
+  this.total = this.subtotal + this.shipping - this.discount;
 
   next();
 });
