@@ -757,6 +757,7 @@ exports.deleteCategory = async (req, res, next) => {
       });
     }
     
+    
     // Check if category has products
     const Product = require('../models/Product');
     const productCount = await Product.countDocuments({ category: category._id });
