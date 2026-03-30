@@ -65,6 +65,8 @@ exports.getRazorpaySettings = async (req, res, next) => {
       data: {
         _id: razorpay._id,
         keyId: razorpay.keyId,
+        keySecret: razorpay.keySecret,
+        webhookSecret: razorpay.webhookSecret,
         isLive: razorpay.isLive,
         isEnabled: razorpay.isEnabled,
         createdAt: razorpay.createdAt,

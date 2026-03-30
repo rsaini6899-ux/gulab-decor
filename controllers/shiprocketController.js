@@ -264,6 +264,7 @@ exports.getShiprocketSettings = async (req, res, next) => {
       data: {
         _id: shiprocket._id,
         email: shiprocket.email,
+        password: shiprocket.password,
         isLive: shiprocket.isLive,
         isEnabled: shiprocket.isEnabled,
         pickupLocation: shiprocket.pickupLocation,
