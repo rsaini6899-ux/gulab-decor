@@ -39,7 +39,14 @@ router.post("/verify-otp", authController.verifyOTP);
 
 // Protected routes (require authentication)
 router.get('/me', authMiddleware, authController.getMe);
-router.put('/profile', authMiddleware, authController.updateProfile);
+// router.put('/profile', authMiddleware, authController.updateProfile);
+router.put(
+  '/profile', 
+  authMiddleware,
+  cloudinaryUpload('auth').fields([{ name: 'avatar', maxCount: 1 }]), // ✅ Changed from 'image' to 'avatar'
+  processCloudinaryResponse,
+  authController.updateProfile
+);
 router.put('/change-password', authMiddleware, authController.changePassword);
 router.post('/logout', authMiddleware, authController.logout);
 

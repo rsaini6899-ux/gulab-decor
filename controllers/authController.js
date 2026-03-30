@@ -1260,6 +1260,59 @@ exports.getMe = async (req, res, next) => {
   }
 };
 
+// exports.updateProfile = async (req, res) => {
+//   try {
+//     const userId = req.user.id;
+//     const { name, email, phone, address, city, state, pincode, landmark } = req.body;
+
+//     const user = await User.findById(userId);
+
+//     if (!user) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'User not found'
+//       });
+//     }
+
+//     // Update fields
+//     if (name) user.name = name;
+//     if (email) user.email = email;
+//     if (phone) user.phone = phone;
+//     if (address) user.address = address;
+//     if (city) user.city = city;
+//     if (state) user.state = state;
+//     if (pincode) user.pincode = pincode;
+//     if (landmark) user.landmark = landmark;
+
+//     await user.save();
+
+//     res.status(200).json({
+//       success: true,
+//       message: 'Profile updated successfully',
+//       data: {
+//         user: {
+//           _id: user._id,
+//           name: user.name,
+//           email: user.email,
+//           phone: user.phone,
+//           address: user.address,
+//           city: user.city,
+//           state: user.state,
+//           pincode: user.pincode,
+//           landmark: user.landmark,
+//         }
+//       }
+//     });
+
+//   } catch (error) {
+//     console.error('Update profile error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: error.message || 'Failed to update profile'
+//     });
+//   }
+// };
+
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -1274,6 +1327,23 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
+    // ✅ Handle avatar image update (similar to blog)
+    if (req.files && req.files.avatar) {
+      const avatarFile = req.files.avatar[0];
+      
+      // Generate URL using the same helper function
+      const filePath = avatarFile.path || avatarFile.filename || `uploads/auth/${avatarFile.filename}`;
+      const imageUrl = getFullImageUrl(req, filePath);
+      
+      req.body.avatar = {
+        url: imageUrl,  // ✅ GENERATED URL
+        public_id: avatarFile.filename,
+        folder: avatarFile.folder || 'auth'
+      };
+      
+      console.log('Profile Update - Generated Avatar URL:', imageUrl); // Debug
+    }
+
     // Update fields
     if (name) user.name = name;
     if (email) user.email = email;
@@ -1283,6 +1353,11 @@ exports.updateProfile = async (req, res) => {
     if (state) user.state = state;
     if (pincode) user.pincode = pincode;
     if (landmark) user.landmark = landmark;
+    
+    // ✅ Update avatar if present in req.body
+    if (req.body.avatar) {
+      user.avatar = req.body.avatar;
+    }
 
     await user.save();
 
@@ -1300,6 +1375,7 @@ exports.updateProfile = async (req, res) => {
           state: user.state,
           pincode: user.pincode,
           landmark: user.landmark,
+          avatar: user.avatar // ✅ Include avatar in response
         }
       }
     });
