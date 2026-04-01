@@ -442,6 +442,7 @@ exports.createCODOrder = async (req, res) => {
 
       const price = variation?.price || product.price;
       const availableStock = variation?.stock;
+
       
       if (availableStock < cartItem.quantity) {
         return res.status(400).json({
@@ -545,6 +546,7 @@ exports.createCODOrder = async (req, res) => {
       } else {
         calculatedDiscount = coupon.discountValue;
       }
+
       
       if (Math.abs(calculatedDiscount - discountAmount) > 1) {
         return res.status(400).json({
