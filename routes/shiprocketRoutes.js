@@ -5,6 +5,7 @@ const authMiddleware = require('../middleware/auth');
 
 // Protected routes (admin only)
 router.get('/settings', authMiddleware, shiprocketController.getShiprocketSettings);
+router.get('/shipping-charges', shiprocketController.getShippingCharges);
 router.post('/settings', authMiddleware, shiprocketController.saveShiprocketSettings);
 router.post('/test-connection', authMiddleware, shiprocketController.testShiprocketConnection);
 
