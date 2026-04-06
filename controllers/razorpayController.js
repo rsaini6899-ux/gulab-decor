@@ -1,6 +1,51 @@
 const Razorpay = require('../models/razorpay');
 
 // ✅ Save Razorpay settings to DB
+// exports.saveRazorpaySettings = async (req, res, next) => {
+//   try {
+//     const { keyId, keySecret, webhookSecret, isLive, isEnabled } = req.body;
+
+//     // Validation
+//     if (!keyId || !keySecret) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Key ID and Key Secret are required'
+//       });
+//     }
+
+//     // Deactivate all previous settings (optional - agar sirf ek active rakhna hai to)
+//     // await Razorpay.updateMany({}, { isActive: false });
+
+//     // Create new settings (automatically encrypts via pre-save hook)
+//     const razorpay = await Razorpay.create({
+//       keyId,
+//       keySecret, 
+//       encryptedKeySecret: keySecret,       // Will be encrypted
+//       webhookSecret,     // Will be encrypted if provided
+//       isLive: isLive || false,
+//       isEnabled: isEnabled !== undefined ? isEnabled : true,
+//       updatedBy: req.user.id
+//     });
+
+//     // Return response without sensitive data
+//     res.status(201).json({
+//       success: true,
+//       message: 'Razorpay settings saved successfully',
+//       data: {
+//         _id: razorpay._id,
+//         keyId: razorpay.keyId,
+//         isLive: razorpay.isLive,
+//         isEnabled: razorpay.isEnabled,
+//         createdAt: razorpay.createdAt,
+//         updatedAt: razorpay.updatedAt
+//         // ❌ keySecret and webhookSecret not sent
+//       }
+//     });
+//   } catch (error) {
+//     console.error('❌ Error saving Razorpay settings:', error);
+//     next(error);
+//   }
+// };
 exports.saveRazorpaySettings = async (req, res, next) => {
   try {
     const { keyId, keySecret, webhookSecret, isLive, isEnabled } = req.body;
@@ -13,20 +58,17 @@ exports.saveRazorpaySettings = async (req, res, next) => {
       });
     }
 
-    // Deactivate all previous settings (optional - agar sirf ek active rakhna hai to)
-    // await Razorpay.updateMany({}, { isActive: false });
-
-    // Create new settings (automatically encrypts via pre-save hook)
+    // ✅ सिर्फ encryptedKeySecret में स्टोर करें
     const razorpay = await Razorpay.create({
       keyId,
-      keySecret,        // Will be encrypted
-      webhookSecret,     // Will be encrypted if provided
+      encryptedKeySecret: keySecret,  // ✅ original secret (pre-save hook encrypt कर देगा)
+      webhookSecret: webhookSecret || '',  // ✅ ये भी encrypt होगा अगर model में pre-save है
       isLive: isLive || false,
       isEnabled: isEnabled !== undefined ? isEnabled : true,
       updatedBy: req.user.id
     });
 
-    // Return response without sensitive data
+    // ✅ Response में sensitive data न भेजें
     res.status(201).json({
       success: true,
       message: 'Razorpay settings saved successfully',
@@ -37,7 +79,6 @@ exports.saveRazorpaySettings = async (req, res, next) => {
         isEnabled: razorpay.isEnabled,
         createdAt: razorpay.createdAt,
         updatedAt: razorpay.updatedAt
-        // ❌ keySecret and webhookSecret not sent
       }
     });
   } catch (error) {
@@ -65,7 +106,7 @@ exports.getRazorpaySettings = async (req, res, next) => {
       data: {
         _id: razorpay._id,
         keyId: razorpay.keyId,
-        keySecret: razorpay.keySecret,
+        keySecret: razorpay.encryptedKeySecret,
         webhookSecret: razorpay.webhookSecret,
         isLive: razorpay.isLive,
         isEnabled: razorpay.isEnabled,

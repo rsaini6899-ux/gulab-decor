@@ -27,15 +27,29 @@ const emailService = require('../utils/orderMail');
 
 
 // Initialize Razorpay with dynamic keys from DB
+// const getRazorpayInstance = async () => {
+//   const settings = await RazorpaySettings.findOne().sort({ createdAt: -1 });
+//   if (!settings) {
+//     throw new Error('Razorpay not configured');
+//   }
+  
+//   return new Razorpay({
+//     key_id: settings.keyId,
+//     key_secret: settings.keySecret
+//   });
+// };
 const getRazorpayInstance = async () => {
   const settings = await RazorpaySettings.findOne().sort({ createdAt: -1 });
   if (!settings) {
     throw new Error('Razorpay not configured');
   }
   
+  // ✅ डिक्रिप्ट करें original secret
+  const decryptedSecret = settings.getDecryptedKeySecret();
+  
   return new Razorpay({
     key_id: settings.keyId,
-    key_secret: settings.keySecret
+    key_secret: decryptedSecret  // ✅ original secret (सिर्फ memory में)
   });
 };
 
@@ -1028,6 +1042,180 @@ exports.createRazorpayOrder = async (req, res) => {
 };
 
 // ==================== VERIFY PAYMENT ====================
+// exports.verifyRazorpayPayment = async (req, res) => {
+//   try {
+//     const {
+//       razorpay_order_id,
+//       razorpay_payment_id,
+//       razorpay_signature,
+//       orderId,
+//       shippingAddress
+//     } = req.body;
+
+//     const userId = req.user.id;
+
+//     // Get razorpay instance with dynamic keys
+//     const settings = await RazorpaySettings.findOne().sort({ createdAt: -1 });
+//     if (!settings) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Razorpay not configured'
+//       });
+//     }
+
+//     // Verify signature
+//     const body = razorpay_order_id + "|" + razorpay_payment_id;
+//     const expectedSignature = crypto
+//       .createHmac("sha256", settings.keySecret) // Use dynamic secret
+//       .update(body.toString())
+//       .digest("hex");
+
+//     if (expectedSignature !== razorpay_signature) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Invalid payment signature'
+//       });
+//     }
+
+//     // Get temporary order
+//     const tempOrder = await Order.findById(orderId);
+//     if (!tempOrder) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Order not found'
+//       });
+//     }
+
+//     // Format shipping address
+//     const formattedShippingAddress = {
+//       fullName: shippingAddress?.fullName || tempOrder.shippingAddress?.fullName || '',
+//       phone: shippingAddress?.phone || tempOrder.shippingAddress?.phone || '',
+//       email: shippingAddress?.email || tempOrder.shippingAddress?.email || '',
+//       address: shippingAddress?.address || shippingAddress?.street || tempOrder.shippingAddress?.address || '',
+//       city: shippingAddress?.city || tempOrder.shippingAddress?.city || '',
+//       state: shippingAddress?.state || tempOrder.shippingAddress?.state || '',
+//       country: shippingAddress?.country || tempOrder.shippingAddress?.country || 'India',
+//       pincode: shippingAddress?.pincode || shippingAddress?.zipCode || tempOrder.shippingAddress?.pincode || '',
+//       landmark: shippingAddress?.landmark || tempOrder.shippingAddress?.landmark || ''
+//     };
+
+//     // Generate final order ID
+//     const year = new Date().getFullYear();
+//     const count = await Order.countDocuments({ isTemporary: false });
+//     const finalOrderId = `ORD-${year}${String(count + 1).padStart(6, '0')}`;
+
+//     // Update order
+//     const updatedOrder = await Order.findByIdAndUpdate(
+//       orderId,
+//       {
+//         orderId: finalOrderId,
+//         shippingAddress: formattedShippingAddress,
+//         billingAddress: formattedShippingAddress,
+//         paymentStatus: 'paid',
+//         paymentDetails: {
+//           transactionId: razorpay_payment_id,
+//           paymentGateway: 'razorpay',
+//           razorpayOrderId: razorpay_order_id,
+//           razorpayPaymentId: razorpay_payment_id,
+//           razorpaySignature: razorpay_signature,
+//           receiptUrl: `https://dashboard.razorpay.com/app/orders/${razorpay_order_id}`
+//         },
+//         status: 'confirmed',
+//         isTemporary: false,
+//         paidAt: new Date(),
+//         estimatedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+//       },
+//       { new: true }
+//     );
+
+//     // Clear cart items
+//     for (const item of updatedOrder.items) {
+//       await Cart.findOneAndUpdate(
+//         { userId },
+//         { 
+//           $pull: { 
+//             items: { 
+//               productId: item.product,
+//               variationId: item.variant
+//             }
+//           }
+//         }
+//       );
+//     }
+
+//     // Update stock
+//     const stockUpdates = [];
+//     for (const item of updatedOrder.items) {
+//       const product = await Product.findById(item.product);
+//       if (product && item.variant) {
+//         const variationIndex = product.variations.findIndex(v => 
+//           v._id.toString() === item.variant.toString()
+//         );
+        
+//         if (variationIndex !== -1) {
+//           stockUpdates.push(
+//             Product.findByIdAndUpdate(item.product, {
+//               $inc: { [`variations.${variationIndex}.stock`]: -item.quantity }
+//             })
+//           );
+//         }
+//       }
+//     }
+//     await Promise.all(stockUpdates);
+
+//     // Update coupon usage
+//     if (updatedOrder.couponCode && updatedOrder.discountAmount > 0) {
+//       const coupon = await Coupon.findOne({ code: updatedOrder.couponCode });
+//       if (coupon) {
+//         const existingEntry = coupon.usedBy.find(entry => 
+//           entry.userId?.toString() === userId.toString()
+//         );
+        
+//         if (!existingEntry) {
+//           coupon.usedCount += 1;
+//           coupon.usedBy.push({
+//             userId,
+//             orderId: updatedOrder._id,
+//             usedAt: new Date(),
+//             orderAmount: updatedOrder.subtotal,
+//             discountApplied: updatedOrder.discountAmount
+//           });
+//           await coupon.save();
+//         }
+//       }
+//     }
+
+//     // Update user stats
+//     await User.findByIdAndUpdate(userId, {
+//       $push: { orders: updatedOrder._id },
+//       $inc: { totalOrders: 1, totalSpent: updatedOrder.total },
+//       lastOrderAt: new Date()
+//     });
+
+//     // Send email notification
+//     const user = await User.findById(userId);
+//     await emailService.sendOrderConfirmation(updatedOrder, user);
+
+//     res.status(200).json({
+//       success: true,
+//       message: updatedOrder.discountAmount > 0 
+//         ? `Payment successful! You saved ₹${updatedOrder.discountAmount}`
+//         : 'Payment successful! Order placed',
+//       data: {
+//         orderId: finalOrderId,
+//         paymentId: razorpay_payment_id,
+//         order: updatedOrder
+//       }
+//     });
+
+//   } catch (error) {
+//     console.error('Error verifying payment:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: error.message || 'Failed to verify payment'
+//     });
+//   }
+// };
 exports.verifyRazorpayPayment = async (req, res) => {
   try {
     const {
@@ -1040,7 +1228,7 @@ exports.verifyRazorpayPayment = async (req, res) => {
 
     const userId = req.user.id;
 
-    // Get razorpay instance with dynamic keys
+    // ✅ Settings लें
     const settings = await RazorpaySettings.findOne().sort({ createdAt: -1 });
     if (!settings) {
       return res.status(400).json({
@@ -1049,21 +1237,42 @@ exports.verifyRazorpayPayment = async (req, res) => {
       });
     }
 
-    // Verify signature
+    // ✅ डिक्रिप्ट करें
+    let decryptedSecret;
+    try {
+      decryptedSecret = settings.getDecryptedKeySecret();
+    } catch (decryptError) {
+      console.error('Decryption failed:', decryptError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to decrypt Razorpay configuration'
+      });
+    }
+
+    if (!decryptedSecret) {
+      return res.status(400).json({
+        success: false,
+        message: 'Razorpay secret not found'
+      });
+    }
+
+    // ✅ Verify signature
     const body = razorpay_order_id + "|" + razorpay_payment_id;
     const expectedSignature = crypto
-      .createHmac("sha256", settings.keySecret) // Use dynamic secret
+      .createHmac("sha256", decryptedSecret)
       .update(body.toString())
       .digest("hex");
 
     if (expectedSignature !== razorpay_signature) {
+      // Delete temporary order
+      await Order.findByIdAndDelete(orderId);
       return res.status(400).json({
         success: false,
-        message: 'Invalid payment signature'
+        message: 'Invalid payment signature. Order cancelled.'
       });
     }
 
-    // Get temporary order
+    // ✅ अब आगे बढ़ें - Temporary order ढूंढें
     const tempOrder = await Order.findById(orderId);
     if (!tempOrder) {
       return res.status(404).json({
@@ -1196,6 +1405,17 @@ exports.verifyRazorpayPayment = async (req, res) => {
 
   } catch (error) {
     console.error('Error verifying payment:', error);
+    
+    // Error होने पर temporary order delete करें
+    if (req.body.orderId) {
+      try {
+        await Order.findByIdAndDelete(req.body.orderId);
+        console.log('Temporary order deleted due to error');
+      } catch (deleteError) {
+        console.error('Failed to delete temporary order:', deleteError);
+      }
+    }
+    
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to verify payment'
@@ -1305,10 +1525,10 @@ exports.cancelShipment = async (req, res) => {
 
 
 // Initialize Razorpay
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_SECRET,
-});
+// const razorpay = new Razorpay({
+//   key_id: process.env.RAZORPAY_KEY_ID,
+//   key_secret: process.env.RAZORPAY_SECRET,
+// });
 
 // CREATE COD ORDER WITH COUPON
 // exports.createCODOrder = async (req, res) => {

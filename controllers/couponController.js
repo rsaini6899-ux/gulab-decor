@@ -771,18 +771,22 @@ exports.toggleVisibility = async (req, res, next) => {
 //       isActive: true, 
 //       endDate: { $gte: new Date() },
 //       showFrontend: true
-//     }).select('code title description discountType discountValue minOrderAmount maxDiscountAmount startDate endDate userLimit usedCount usedBy');
+//     }).select('code title description discountType discountValue minOrderAmount maxDiscountAmount startDate endDate userLimit perUserLimit usedCount usedBy');
     
-//     // 🎯 Add userAlreadyUsed flag for each coupon
+//     // 🎯 Add userAlreadyUsed and user usage info for each coupon
 //     const couponsWithUserInfo = coupons.map(coupon => {
 //       const couponObj = coupon.toObject();
       
 //       if (userId) {
-//         couponObj.userAlreadyUsed = coupon.usedBy.some(entry => 
-//           entry.userId && entry.userId.toString() === userId.toString()
-//         );
+//         const userUsageCount = coupon.getUserUsageCount(userId);
+//         couponObj.userAlreadyUsed = userUsageCount > 0;
+//         couponObj.userUsageCount = userUsageCount;
+//         couponObj.remainingUserUses = coupon.perUserLimit - userUsageCount;
+//         couponObj.perUserLimit = coupon.perUserLimit;
 //       } else {
 //         couponObj.userAlreadyUsed = false;
+//         couponObj.userUsageCount = 0;
+//         couponObj.remainingUserUses = coupon.perUserLimit;
 //       }
       
 //       // Calculate remaining uses
@@ -803,10 +807,11 @@ exports.toggleVisibility = async (req, res, next) => {
 //       error: error.message
 //     });
 //   }
-// }
+// };
+
 exports.validateCouponForCustomer = async (req, res, next) => {
   try {
-    const userId = req.user?.id; // Agar user login hai to
+    const userId = req.user?.id;
     
     const coupons = await Coupon.find({ 
       isActive: true, 
@@ -814,27 +819,42 @@ exports.validateCouponForCustomer = async (req, res, next) => {
       showFrontend: true
     }).select('code title description discountType discountValue minOrderAmount maxDiscountAmount startDate endDate userLimit perUserLimit usedCount usedBy');
     
-    // 🎯 Add userAlreadyUsed and user usage info for each coupon
-    const couponsWithUserInfo = coupons.map(coupon => {
-      const couponObj = coupon.toObject();
-      
-      if (userId) {
-        const userUsageCount = coupon.getUserUsageCount(userId);
-        couponObj.userAlreadyUsed = userUsageCount > 0;
-        couponObj.userUsageCount = userUsageCount;
-        couponObj.remainingUserUses = coupon.perUserLimit - userUsageCount;
-        couponObj.perUserLimit = coupon.perUserLimit;
-      } else {
-        couponObj.userAlreadyUsed = false;
-        couponObj.userUsageCount = 0;
-        couponObj.remainingUserUses = coupon.perUserLimit;
-      }
-      
-      // Calculate remaining uses
-      couponObj.remainingUses = coupon.userLimit - coupon.usedCount;
-      
-      return couponObj;
-    });
+    // 🎯 Filter coupons based on user usage
+    const couponsWithUserInfo = coupons
+      .map(coupon => {
+        const couponObj = coupon.toObject();
+        
+        if (userId) {
+          const userUsageCount = coupon.getUserUsageCount(userId);
+          couponObj.userAlreadyUsed = userUsageCount > 0;
+          couponObj.userUsageCount = userUsageCount;
+          couponObj.remainingUserUses = coupon.perUserLimit - userUsageCount;
+          couponObj.perUserLimit = coupon.perUserLimit;
+          couponObj.hasReachedUserLimit = userUsageCount >= coupon.perUserLimit;
+        } else {
+          couponObj.userAlreadyUsed = false;
+          couponObj.userUsageCount = 0;
+          couponObj.remainingUserUses = coupon.perUserLimit;
+          couponObj.hasReachedUserLimit = false;
+        }
+        
+        couponObj.remainingUses = coupon.userLimit - coupon.usedCount;
+        couponObj.hasReachedTotalLimit = coupon.usedCount >= coupon.userLimit;
+        couponObj.isExpired = coupon.endDate < new Date();
+        
+        return couponObj;
+      })
+      // 🎯 CRITICAL: Filter out coupons that user cannot use
+      .filter(coupon => {
+        // Don't show if total limit reached
+        if (coupon.hasReachedTotalLimit) return false;
+        // Don't show if expired
+        if (coupon.isExpired) return false;
+        // Don't show if user has reached per-user limit
+        if (userId && coupon.hasReachedUserLimit) return false;
+        // Don't show if min order amount not met (will be checked separately)
+        return true;
+      });
     
     res.status(200).json({
       success: true,
@@ -852,128 +872,6 @@ exports.validateCouponForCustomer = async (req, res, next) => {
 
 
 // Apply coupon to order
-// exports.applyCoupon = async (req, res) => {
-//   try {
-//     const { code, orderAmount } = req.body;
-//     const userId = req.user?.id; // Get user ID from auth middleware
-    
-    
-//     if (!code || !orderAmount) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Coupon code and order amount are required'
-//       });
-//     }
-    
-//     // Find coupon
-//     const coupon = await Coupon.findOne({ 
-//       code: code.toUpperCase(), 
-//       isActive: true,
-//       startDate: { $lte: new Date() },
-//       endDate: { $gte: new Date() }
-//     });
-    
-//     console.log('Found coupon:', coupon ? {
-//       id: coupon._id,
-//       code: coupon.code,
-//       usedCount: coupon.usedCount,
-//       userLimit: coupon.userLimit,
-//       usedBy: coupon.usedBy.map(u => ({
-//         userId: u.userId?.toString(),
-//         usedAt: u.usedAt
-//       }))
-//     } : 'No coupon found');
-    
-//     if (!coupon) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Invalid or expired coupon'
-//       });
-//     }
-    
-//     // 🎯 IMPORTANT: Check if user has already used this coupon
-//     if (userId) {
-//       console.log('Checking if user', userId, 'has used this coupon');
-      
-//       const userAlreadyUsed = coupon.usedBy.some(entry => {
-//         const entryUserId = entry.userId?.toString();
-//         const currentUserId = userId.toString();
-//         console.log(`Comparing: ${entryUserId} === ${currentUserId}?`, entryUserId === currentUserId);
-//         return entryUserId === currentUserId;
-//       });
-      
-//       console.log('User already used:', userAlreadyUsed);
-      
-//       if (userAlreadyUsed) {
-//         return res.status(400).json({
-//           success: false,
-//           message: 'You have already used this coupon'
-//         });
-//       }
-//     } else {
-//       console.log('No userId found in request!');
-//     }
-    
-//     // Check usage limit
-//     if (coupon.usedCount >= coupon.userLimit) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Coupon usage limit reached'
-//       });
-//     }
-    
-//     // Check minimum order amount
-//     if (orderAmount < coupon.minOrderAmount) {
-//       return res.status(400).json({
-//         success: false,
-//         message: `Minimum order amount is ₹${coupon.minOrderAmount}`
-//       });
-//     }
-    
-//     // Calculate discount
-//     let discount = 0;
-//     if (coupon.discountType === 'percentage') {
-//       discount = (orderAmount * coupon.discountValue) / 100;
-//       if (coupon.maxDiscountAmount && discount > coupon.maxDiscountAmount) {
-//         discount = coupon.maxDiscountAmount;
-//       }
-//     } else if (coupon.discountType === 'fixed') {
-//       discount = coupon.discountValue;
-//     }
-    
-//     // Round discount to 2 decimal places
-//     discount = Math.round(discount * 100) / 100;
-    
-//     // Prepare coupon object for response
-//     const couponObj = coupon.toObject();
-    
-//     // Add userAlreadyUsed flag
-//     couponObj.userAlreadyUsed = userId ? 
-//       coupon.usedBy.some(entry => entry.userId?.toString() === userId.toString()) : 
-//       false;
-    
-//     console.log('Sending response with userAlreadyUsed:', couponObj.userAlreadyUsed);
-//     console.log('=========================================');
-    
-//     res.status(200).json({
-//       success: true,
-//       message: 'Coupon applied successfully',
-//       data: {
-//         coupon: couponObj,
-//         discount,
-//         finalAmount: orderAmount - discount
-//       }
-//     });
-    
-//   } catch (error) {
-//     console.error('Apply coupon error:', error);
-//     res.status(500).json({
-//       success: false,
-//       message: 'Server error applying coupon',
-//       error: error.message
-//     });
-//   }
-// };
 exports.applyCoupon = async (req, res) => {
   try {
     const { code, orderAmount } = req.body;
@@ -1109,53 +1007,6 @@ exports.applyCoupon = async (req, res) => {
 
 
 // Record coupon usage
-// exports.recordUsage = async (req, res, next) => {
-//   const { orderId, orderAmount, userId } = req.body;
-  
-//   const coupon = await Coupon.findById(req.params.id);
-  
-//   if (!coupon) {
-//     return 'Coupon not found'
-//   }
-  
-//   // Validate coupon
-//   const validation = await Coupon.validateCoupon(coupon.code, orderAmount);
-//   if (!validation.valid) {
-//     return validation.message
-//   }
-  
-//   // Calculate discount
-//   let discount = 0;
-//   if (coupon.discountType === 'percentage') {
-//     discount = (orderAmount * coupon.discountValue) / 100;
-//     if (coupon.maxDiscountAmount && discount > coupon.maxDiscountAmount) {
-//       discount = coupon.maxDiscountAmount;
-//     }
-//   } else if (coupon.discountType === 'fixed') {
-//     discount = coupon.discountValue;
-//   }
-  
-//   // Record usage
-//   coupon.usedCount += 1;
-//   coupon.usedBy.push({
-//     userId,
-//     orderId,
-//     orderAmount,
-//     discountApplied: discount
-//   });
-  
-//   await coupon.save();
-  
-//   res.status(200).json({
-//     success: true,
-//     message: 'Coupon usage recorded',
-//     data: {
-//       coupon,
-//       discount,
-//       finalAmount: orderAmount - discount
-//     }
-//   });
-// }
 exports.recordUsage = async (req, res, next) => {
   try {
     const { orderId, orderAmount, userId } = req.body;
@@ -1247,51 +1098,6 @@ exports.recordUsage = async (req, res, next) => {
 };
 
 // Get coupon statistics
-// exports.getStats = async (req, res, next) => {
-//   const thirtyDaysAgo = new Date();
-//   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  
-//   const stats = await Coupon.aggregate([
-//     // Total coupons
-//     { $group: { _id: null, totalCoupons: { $sum: 1 } } },
-    
-//     // Active coupons
-//     { $match: { isActive: true, endDate: { $gte: new Date() } } },
-//     { $group: { _id: null, activeCoupons: { $sum: 1 } } },
-    
-//     // Total usage
-//     { $group: { _id: null, totalUsage: { $sum: '$usedCount' } } },
-    
-//     // Expired coupons
-//     { $match: { endDate: { $lt: new Date() } } },
-//     { $group: { _id: null, expiredCoupons: { $sum: 1 } } },
-    
-//     // Recent usage (last 30 days)
-//     { $unwind: '$usedBy' },
-//     { $match: { 'usedBy.usedAt': { $gte: thirtyDaysAgo } } },
-//     { $group: { _id: null, recentUsage: { $sum: 1 } } }
-//   ]);
-  
-//   // Discount type distribution
-//   const discountDistribution = await Coupon.aggregate([
-//     { $group: { _id: '$discountType', count: { $sum: 1 } } }
-//   ]);
-  
-//   // Top coupons by usage
-//   const topCoupons = await Coupon.find()
-//     .sort({ usedCount: -1 })
-//     .limit(5)
-//     .select('code title usedCount userLimit');
-  
-//   res.status(200).json({
-//     success: true,
-//     data: {
-//       overview: stats[0] || {},
-//       discountDistribution,
-//       topCoupons
-//     }
-//   });
-// }
 exports.getStats = async (req, res, next) => {
   try {
     const thirtyDaysAgo = new Date();
