@@ -46,7 +46,8 @@ app.use(cors({
     'http://localhost:5174',
     'https://gulabi-decore.netlify.app',
     'https://gulabi-decore-admin.netlify.app',
-    'https://delicate-chimera-0b925b.netlify.app'
+    'https://delicate-chimera-0b925b.netlify.app',
+    'https://stellar-youtiao-ca4482.netlify.app'
   ].filter(Boolean),
   credentials: true
 }));
