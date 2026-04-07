@@ -11,9 +11,14 @@ const blogSchema = new mongoose.Schema({
     public_id: String,
     folder: String
   },
-  category: {
-    type: String,
-    required: [true, 'Blog category is required']
+  // category: {
+  //   type: String,
+  //   required: [true, 'Blog category is required']
+  // },
+    category: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category',
+    required: true
   },
   status: {
     type: String,

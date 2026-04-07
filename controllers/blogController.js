@@ -213,10 +213,12 @@ exports.getPublishedBlogs = async (req, res, next) => {
 
     // Get blogs
     const blogs = await Blog.find(query)
+      .populate('category', 'name slug') // Populate category name and slug
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .select('title image category createdAt')
       .lean();
+
 
     res.status(200).json({
       success: true,
