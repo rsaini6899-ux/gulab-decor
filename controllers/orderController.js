@@ -771,26 +771,271 @@ exports.createCODOrder = async (req, res) => {
 };
 
 // ==================== RAZORPAY ORDER ====================
+// exports.createRazorpayOrder = async (req, res) => {
+//   try {
+//     const userId = req.user.id;
+//     const { shippingAddress, shippingMethod = 'standard', couponCode, discountAmount } = req.body;
+
+//     // Get razorpay instance with dynamic keys
+//     const razorpay = await getRazorpayInstance();
+
+//     const cart = await Cart.findOne({ userId }).populate({
+//       path: 'items.productId',
+//       model: 'Product',
+//       select: 'name price images variations colorImages category attributes stock sku'
+//     });
+
+//     if (!cart || cart.items.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Cart is empty'
+//       });
+//     }
+
+//     const formattedShippingAddress = {
+//       fullName: shippingAddress?.fullName || '',
+//       phone: shippingAddress?.phone || '',
+//       email: shippingAddress?.email || '',
+//       address: shippingAddress?.street || shippingAddress?.address || '',
+//       city: shippingAddress?.city || '',
+//       state: shippingAddress?.state || '',
+//       country: shippingAddress?.country || 'India',
+//       pincode: shippingAddress?.pincode || shippingAddress?.zipCode || '',
+//       landmark: shippingAddress?.landmark || ''
+//     };
+
+//     const requiredFields = ['fullName', 'phone', 'address', 'city', 'state', 'pincode'];
+//     const missingFields = requiredFields.filter(field => !formattedShippingAddress[field]);
+    
+//     if (missingFields.length > 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: `Missing required fields: ${missingFields.join(', ')}`
+//       });
+//     }
+
+//     // Calculate totals (same as COD)
+//     let subtotal = 0;
+//     const items = [];
+
+//     for (const cartItem of cart.items) {
+//       const product = cartItem.productId;
+//       if (!product) continue;
+
+//       let variation = null;
+//       let variationDetails = {};
+      
+//       if (cartItem.variationId && product.variations?.length > 0) {
+//         variation = product.variations.find(v => 
+//           v._id.toString() === cartItem.variationId.toString()
+//         );
+        
+//         if (!variation) {
+//           return res.status(400).json({
+//             success: false,
+//             message: `Variation not found for ${product.name}`
+//           });
+//         }
+
+//         variationDetails = {
+//           color: variation.color,
+//           attributes: variation.attributes || [],
+//           sku: variation.sku || product.sku,
+//           price: variation.price,
+//           stock: variation.stock
+//         };
+//       }
+
+//       const price = variation?.price || product.price;
+//       const availableStock = variation?.stock;
+      
+//       if (availableStock < cartItem.quantity) {
+//         return res.status(400).json({
+//           success: false,
+//           message: `Insufficient stock for ${product.name} (${variation?.color || 'variation'})`
+//         });
+//       }
+
+//       const itemTotal = price * cartItem.quantity;
+//       subtotal += itemTotal;
+
+//       let image = product.images?.[0]?.url;
+//       if (variation?.color && product.colorImages) {
+//         const colorGroup = product.colorImages.find(ci => ci.color === variation.color);
+//         if (colorGroup?.images?.length > 0) {
+//           const mainImg = colorGroup.images.find(img => img.isMain);
+//           image = mainImg?.url || colorGroup.images[0].url;
+//         }
+//       }
+
+//       items.push({
+//         product: product._id,
+//         variant: cartItem.variationId,
+//         name: product.name,
+//         sku: variationDetails.sku || product.sku,
+//         price,
+//         quantity: cartItem.quantity,
+//         total: itemTotal,
+//         image,
+//         color: variationDetails.color || null,
+//         attributes: variationDetails.attributes || [],
+//         productDetails: {
+//           category: product.category,
+//           attributes: product.attributes || []
+//         }
+//       });
+//     }
+
+//     let shipping = 0;
+//     switch (shippingMethod) {
+//       case 'express': shipping = 199; break;
+//       case 'priority': shipping = 299; break;
+//       default: shipping = 99;
+//     }
+
+//     // const tax = Math.round(subtotal * 0.18);
+//     let total = subtotal + shipping;
+    
+//     let appliedCoupon = null;
+//     let finalDiscountAmount = 0;
+    
+//     if (couponCode && discountAmount) {
+//       const coupon = await Coupon.findOne({ 
+//         code: couponCode.toUpperCase(),
+//         isActive: true,
+//         startDate: { $lte: new Date() },
+//         endDate: { $gte: new Date() }
+//       });
+      
+//       if (!coupon) {
+//         return res.status(400).json({
+//           success: false,
+//           message: 'Invalid or expired coupon'
+//         });
+//       }
+      
+//       const userUsedCoupon = coupon.usedBy.some(entry => 
+//         entry.userId?.toString() === userId.toString()
+//       );
+      
+//       if (userUsedCoupon) {
+//         return res.status(400).json({
+//           success: false,
+//           message: 'You have already used this coupon'
+//         });
+//       }
+      
+//       if (subtotal < coupon.minOrderAmount) {
+//         return res.status(400).json({
+//           success: false,
+//           message: `Minimum order amount for this coupon is ₹${coupon.minOrderAmount}`
+//         });
+//       }
+      
+//       let calculatedDiscount = 0;
+//       if (coupon.discountType === 'percentage') {
+//         calculatedDiscount = (subtotal * coupon.discountValue) / 100;
+//         if (coupon.maxDiscountAmount && calculatedDiscount > coupon.maxDiscountAmount) {
+//           calculatedDiscount = coupon.maxDiscountAmount;
+//         }
+//       } else {
+//         calculatedDiscount = coupon.discountValue;
+//       }
+      
+//       if (Math.abs(calculatedDiscount - discountAmount) > 1) {
+//         return res.status(400).json({
+//           success: false,
+//           message: 'Discount amount mismatch'
+//         });
+//       }
+      
+//       finalDiscountAmount = calculatedDiscount;
+//       appliedCoupon = coupon;
+//       total = total - finalDiscountAmount;
+//     }
+
+//     // Create temporary order
+//     const tempOrder = await Order.create({
+//       orderId: `TEMP-${Date.now()}`,
+//       customer: userId,
+//       items,
+//       shippingAddress: formattedShippingAddress,
+//       shippingMethod,
+//       subtotal,
+//       shipping,
+//       // tax,
+//       total,
+//       couponCode: appliedCoupon?.code || null,
+//       discountAmount: finalDiscountAmount,
+//       discountType: appliedCoupon?.discountType || null,
+//       paymentMethod: 'razorpay',
+//       paymentStatus: 'pending',
+//       status: 'pending',
+//       currency: 'INR',
+//       createdBy: userId,
+//       isTemporary: true
+//     });
+
+//     // Get Razorpay settings for key_id
+//     const settings = await RazorpaySettings.findOne().sort({ createdAt: -1 });
+
+//     // Create Razorpay order
+//     const razorpayOrder = await razorpay.orders.create({
+//       amount: Math.round(total * 100),
+//       currency: 'INR',
+//       receipt: `receipt_${tempOrder._id}`,
+//       notes: {
+//         orderId: tempOrder._id.toString(),
+//         userId: userId.toString(),
+//         cartId: cart._id.toString(),
+//         couponCode: appliedCoupon?.code || '',
+//         discountAmount: finalDiscountAmount.toString()
+//       },
+//       payment_capture: 1
+//     });
+
+//     res.status(200).json({
+//       success: true,
+//       message: finalDiscountAmount > 0 
+//         ? `Order created! You saved ₹${finalDiscountAmount}`
+//         : 'Order created successfully',
+//       data: {
+//         razorpayOrderId: razorpayOrder.id,
+//         amount: razorpayOrder.amount,
+//         currency: razorpayOrder.currency,
+//         orderId: tempOrder._id,
+//         key: settings.keyId, // Dynamic key from DB
+//         name: process.env.STORE_NAME || "Your Store",
+//         description: "Order Payment",
+//         couponApplied: appliedCoupon ? {
+//           code: appliedCoupon.code,
+//           discount: finalDiscountAmount
+//         } : null,
+//         prefill: {
+//           name: formattedShippingAddress.fullName,
+//           email: formattedShippingAddress.email,
+//           contact: formattedShippingAddress.phone
+//         },
+//         theme: { color: "#3B82F6" }
+//       }
+//     });
+
+//   } catch (error) {
+//     console.error('Error creating Razorpay order:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: error.message || 'Failed to create payment order'
+//     });
+//   }
+// };
 exports.createRazorpayOrder = async (req, res) => {
   try {
     const userId = req.user.id;
     const { shippingAddress, shippingMethod = 'standard', couponCode, discountAmount } = req.body;
 
-     console.log("User ID:", userId);
-    console.log("Shipping Address:", shippingAddress);
-    console.log("Shipping Method:", shippingMethod);
-    console.log("Coupon Code:", couponCode);
-    console.log("Discount Amount:", discountAmount);
-
-    // Get razorpay instance with dynamic keys
     const razorpay = await getRazorpayInstance();
-
-     console.log("Razorpay Instance:", razorpay);
-
-    console.log('req.body:', req.body );
-    console.log('Razorpay instance:', razorpay);
-
-
+    
+    // ✅ Get cart and validate (same as before)
     const cart = await Cart.findOne({ userId }).populate({
       path: 'items.productId',
       model: 'Product',
@@ -804,32 +1049,10 @@ exports.createRazorpayOrder = async (req, res) => {
       });
     }
 
-    const formattedShippingAddress = {
-      fullName: shippingAddress?.fullName || '',
-      phone: shippingAddress?.phone || '',
-      email: shippingAddress?.email || '',
-      address: shippingAddress?.street || shippingAddress?.address || '',
-      city: shippingAddress?.city || '',
-      state: shippingAddress?.state || '',
-      country: shippingAddress?.country || 'India',
-      pincode: shippingAddress?.pincode || shippingAddress?.zipCode || '',
-      landmark: shippingAddress?.landmark || ''
-    };
-
-    const requiredFields = ['fullName', 'phone', 'address', 'city', 'state', 'pincode'];
-    const missingFields = requiredFields.filter(field => !formattedShippingAddress[field]);
-    
-    if (missingFields.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `Missing required fields: ${missingFields.join(', ')}`
-      });
-    }
-
-    // Calculate totals (same as COD)
+    // ✅ Calculate totals (same logic as before)
     let subtotal = 0;
     const items = [];
-
+    
     for (const cartItem of cart.items) {
       const product = cartItem.productId;
       if (!product) continue;
@@ -898,6 +1121,7 @@ exports.createRazorpayOrder = async (req, res) => {
       });
     }
 
+    // Calculate shipping and total
     let shipping = 0;
     switch (shippingMethod) {
       case 'express': shipping = 199; break;
@@ -905,12 +1129,12 @@ exports.createRazorpayOrder = async (req, res) => {
       default: shipping = 99;
     }
 
-    // const tax = Math.round(subtotal * 0.18);
     let total = subtotal + shipping;
     
     let appliedCoupon = null;
     let finalDiscountAmount = 0;
     
+    // ✅ Validate coupon if provided
     if (couponCode && discountAmount) {
       const coupon = await Coupon.findOne({ 
         code: couponCode.toUpperCase(),
@@ -966,38 +1190,76 @@ exports.createRazorpayOrder = async (req, res) => {
       total = total - finalDiscountAmount;
     }
 
-    // Create temporary order
-    const tempOrder = await Order.create({
-      orderId: `TEMP-${Date.now()}`,
-      customer: userId,
+    // ✅ Format shipping address
+    const formattedShippingAddress = {
+      fullName: shippingAddress?.fullName || '',
+      phone: shippingAddress?.phone || '',
+      email: shippingAddress?.email || '',
+      address: shippingAddress?.street || shippingAddress?.address || '',
+      city: shippingAddress?.city || '',
+      state: shippingAddress?.state || '',
+      country: shippingAddress?.country || 'India',
+      pincode: shippingAddress?.pincode || shippingAddress?.zipCode || '',
+      landmark: shippingAddress?.landmark || ''
+    };
+
+    // ✅ Validate address
+    const requiredFields = ['fullName', 'phone', 'address', 'city', 'state', 'pincode'];
+    const missingFields = requiredFields.filter(field => !formattedShippingAddress[field]);
+    
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Missing required fields: ${missingFields.join(', ')}`
+      });
+    }
+
+    // ✅ Create a temporary session ID (not DB order)
+    const tempSessionId = crypto.randomBytes(32).toString('hex');
+    
+    // ✅ Store order data in Redis or memory cache (optional but recommended)
+    // For production, use Redis. For simplicity, we'll use a Map or return data in token
+    const orderSessionData = {
+      userId,
+      cartId: cart._id,
       items,
       shippingAddress: formattedShippingAddress,
       shippingMethod,
       subtotal,
       shipping,
-      // tax,
       total,
       couponCode: appliedCoupon?.code || null,
       discountAmount: finalDiscountAmount,
       discountType: appliedCoupon?.discountType || null,
-      paymentMethod: 'razorpay',
-      paymentStatus: 'pending',
-      status: 'pending',
-      currency: 'INR',
-      createdBy: userId,
-      isTemporary: true
-    });
+      couponData: appliedCoupon,
+      createdAt: new Date()
+    };
+    
+    // Store in Redis or Memory (5 minute expiry)
+    // Using a simple Map here (for production use Redis)
+    if (!global.tempOrderSessions) {
+      global.tempOrderSessions = new Map();
+    }
+    global.tempOrderSessions.set(tempSessionId, orderSessionData);
+    
+    // Set timeout to clear after 10 minutes
+    setTimeout(() => {
+      if (global.tempOrderSessions.has(tempSessionId)) {
+        global.tempOrderSessions.delete(tempSessionId);
+        console.log(`Cleared temp session ${tempSessionId} due to timeout`);
+      }
+    }, 10 * 60 * 1000);
 
-    // Get Razorpay settings for key_id
+    // ✅ Get Razorpay settings
     const settings = await RazorpaySettings.findOne().sort({ createdAt: -1 });
 
-    // Create Razorpay order
+    // ✅ Create Razorpay order
     const razorpayOrder = await razorpay.orders.create({
       amount: Math.round(total * 100),
       currency: 'INR',
-      receipt: `receipt_${tempOrder._id}`,
+      receipt: `receipt_${tempSessionId.substring(0, 20)}`,
       notes: {
-        orderId: tempOrder._id.toString(),
+        tempSessionId: tempSessionId,
         userId: userId.toString(),
         cartId: cart._id.toString(),
         couponCode: appliedCoupon?.code || '',
@@ -1009,14 +1271,14 @@ exports.createRazorpayOrder = async (req, res) => {
     res.status(200).json({
       success: true,
       message: finalDiscountAmount > 0 
-        ? `Order created! You saved ₹${finalDiscountAmount}`
-        : 'Order created successfully',
+        ? `Ready for payment! You saved ₹${finalDiscountAmount}`
+        : 'Ready for payment',
       data: {
+        tempOrderId: tempSessionId, // Session ID, not DB order ID
         razorpayOrderId: razorpayOrder.id,
         amount: razorpayOrder.amount,
         currency: razorpayOrder.currency,
-        orderId: tempOrder._id,
-        key: settings.keyId, // Dynamic key from DB
+        key: settings.keyId,
         name: process.env.STORE_NAME || "Your Store",
         description: "Order Payment",
         couponApplied: appliedCoupon ? {
@@ -1054,7 +1316,7 @@ exports.createRazorpayOrder = async (req, res) => {
 
 //     const userId = req.user.id;
 
-//     // Get razorpay instance with dynamic keys
+//     // ✅ Settings लें
 //     const settings = await RazorpaySettings.findOne().sort({ createdAt: -1 });
 //     if (!settings) {
 //       return res.status(400).json({
@@ -1063,21 +1325,42 @@ exports.createRazorpayOrder = async (req, res) => {
 //       });
 //     }
 
-//     // Verify signature
+//     // ✅ डिक्रिप्ट करें
+//     let decryptedSecret;
+//     try {
+//       decryptedSecret = settings.getDecryptedKeySecret();
+//     } catch (decryptError) {
+//       console.error('Decryption failed:', decryptError);
+//       return res.status(500).json({
+//         success: false,
+//         message: 'Failed to decrypt Razorpay configuration'
+//       });
+//     }
+
+//     if (!decryptedSecret) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Razorpay secret not found'
+//       });
+//     }
+
+//     // ✅ Verify signature
 //     const body = razorpay_order_id + "|" + razorpay_payment_id;
 //     const expectedSignature = crypto
-//       .createHmac("sha256", settings.keySecret) // Use dynamic secret
+//       .createHmac("sha256", decryptedSecret)
 //       .update(body.toString())
 //       .digest("hex");
 
 //     if (expectedSignature !== razorpay_signature) {
+//       // Delete temporary order
+//       await Order.findByIdAndDelete(orderId);
 //       return res.status(400).json({
 //         success: false,
-//         message: 'Invalid payment signature'
+//         message: 'Invalid payment signature. Order cancelled.'
 //       });
 //     }
 
-//     // Get temporary order
+//     // ✅ अब आगे बढ़ें - Temporary order ढूंढें
 //     const tempOrder = await Order.findById(orderId);
 //     if (!tempOrder) {
 //       return res.status(404).json({
@@ -1210,6 +1493,17 @@ exports.createRazorpayOrder = async (req, res) => {
 
 //   } catch (error) {
 //     console.error('Error verifying payment:', error);
+    
+//     // Error होने पर temporary order delete करें
+//     if (req.body.orderId) {
+//       try {
+//         await Order.findByIdAndDelete(req.body.orderId);
+//         console.log('Temporary order deleted due to error');
+//       } catch (deleteError) {
+//         console.error('Failed to delete temporary order:', deleteError);
+//       }
+//     }
+    
 //     res.status(500).json({
 //       success: false,
 //       message: error.message || 'Failed to verify payment'
@@ -1222,13 +1516,31 @@ exports.verifyRazorpayPayment = async (req, res) => {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
-      orderId,
+      tempOrderId,  // ✅ Session ID instead of DB order ID
       shippingAddress
     } = req.body;
 
     const userId = req.user.id;
 
-    // ✅ Settings लें
+    // ✅ Get temporary order data from session storage
+    if (!global.tempOrderSessions || !global.tempOrderSessions.has(tempOrderId)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session expired or invalid. Please try again.'
+      });
+    }
+
+    const sessionData = global.tempOrderSessions.get(tempOrderId);
+    
+    // ✅ Verify user matches
+    if (sessionData.userId.toString() !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized access'
+      });
+    }
+
+    // ✅ Get Razorpay settings
     const settings = await RazorpaySettings.findOne().sort({ createdAt: -1 });
     if (!settings) {
       return res.status(400).json({
@@ -1237,7 +1549,7 @@ exports.verifyRazorpayPayment = async (req, res) => {
       });
     }
 
-    // ✅ डिक्रिप्ट करें
+    // ✅ Decrypt secret
     let decryptedSecret;
     try {
       decryptedSecret = settings.getDecryptedKeySecret();
@@ -1249,13 +1561,6 @@ exports.verifyRazorpayPayment = async (req, res) => {
       });
     }
 
-    if (!decryptedSecret) {
-      return res.status(400).json({
-        success: false,
-        message: 'Razorpay secret not found'
-      });
-    }
-
     // ✅ Verify signature
     const body = razorpay_order_id + "|" + razorpay_payment_id;
     const expectedSignature = crypto
@@ -1264,156 +1569,141 @@ exports.verifyRazorpayPayment = async (req, res) => {
       .digest("hex");
 
     if (expectedSignature !== razorpay_signature) {
-      // Delete temporary order
-      await Order.findByIdAndDelete(orderId);
+      // ✅ Clear session data
+      global.tempOrderSessions.delete(tempOrderId);
       return res.status(400).json({
         success: false,
-        message: 'Invalid payment signature. Order cancelled.'
+        message: 'Invalid payment signature. Please try again.'
       });
     }
 
-    // ✅ अब आगे बढ़ें - Temporary order ढूंढें
-    const tempOrder = await Order.findById(orderId);
-    if (!tempOrder) {
-      return res.status(404).json({
-        success: false,
-        message: 'Order not found'
-      });
-    }
-
-    // Format shipping address
+    // ✅ Format shipping address (use provided or from session)
     const formattedShippingAddress = {
-      fullName: shippingAddress?.fullName || tempOrder.shippingAddress?.fullName || '',
-      phone: shippingAddress?.phone || tempOrder.shippingAddress?.phone || '',
-      email: shippingAddress?.email || tempOrder.shippingAddress?.email || '',
-      address: shippingAddress?.address || shippingAddress?.street || tempOrder.shippingAddress?.address || '',
-      city: shippingAddress?.city || tempOrder.shippingAddress?.city || '',
-      state: shippingAddress?.state || tempOrder.shippingAddress?.state || '',
-      country: shippingAddress?.country || tempOrder.shippingAddress?.country || 'India',
-      pincode: shippingAddress?.pincode || shippingAddress?.zipCode || tempOrder.shippingAddress?.pincode || '',
-      landmark: shippingAddress?.landmark || tempOrder.shippingAddress?.landmark || ''
+      fullName: shippingAddress?.fullName || sessionData.shippingAddress.fullName,
+      phone: shippingAddress?.phone || sessionData.shippingAddress.phone,
+      email: shippingAddress?.email || sessionData.shippingAddress.email,
+      address: shippingAddress?.address || shippingAddress?.street || sessionData.shippingAddress.address,
+      city: shippingAddress?.city || sessionData.shippingAddress.city,
+      state: shippingAddress?.state || sessionData.shippingAddress.state,
+      country: shippingAddress?.country || sessionData.shippingAddress.country,
+      pincode: shippingAddress?.pincode || shippingAddress?.zipCode || sessionData.shippingAddress.pincode,
+      landmark: shippingAddress?.landmark || sessionData.shippingAddress.landmark
     };
 
-    // Generate final order ID
+    // ✅ Generate final order ID
     const year = new Date().getFullYear();
-    const count = await Order.countDocuments({ isTemporary: false });
+    const count = await Order.countDocuments({});
     const finalOrderId = `ORD-${year}${String(count + 1).padStart(6, '0')}`;
 
-    // Update order
-    const updatedOrder = await Order.findByIdAndUpdate(
-      orderId,
-      {
-        orderId: finalOrderId,
-        shippingAddress: formattedShippingAddress,
-        billingAddress: formattedShippingAddress,
-        paymentStatus: 'paid',
-        paymentDetails: {
-          transactionId: razorpay_payment_id,
-          paymentGateway: 'razorpay',
-          razorpayOrderId: razorpay_order_id,
-          razorpayPaymentId: razorpay_payment_id,
-          razorpaySignature: razorpay_signature,
-          receiptUrl: `https://dashboard.razorpay.com/app/orders/${razorpay_order_id}`
-        },
-        status: 'confirmed',
-        isTemporary: false,
-        paidAt: new Date(),
-        estimatedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    // ✅ CREATE ORDER NOW (only after successful payment)
+    const order = await Order.create({
+      orderId: finalOrderId,
+      customer: userId,
+      items: sessionData.items,
+      shippingAddress: formattedShippingAddress,
+      billingAddress: formattedShippingAddress,
+      shippingMethod: sessionData.shippingMethod,
+      subtotal: sessionData.subtotal,
+      shipping: sessionData.shipping,
+      total: sessionData.total,
+      couponCode: sessionData.couponCode,
+      discountAmount: sessionData.discountAmount,
+      discountType: sessionData.discountType,
+      paymentMethod: 'razorpay',
+      paymentStatus: 'paid',
+      paymentDetails: {
+        transactionId: razorpay_payment_id,
+        paymentGateway: 'razorpay',
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        razorpaySignature: razorpay_signature,
+        receiptUrl: `https://dashboard.razorpay.com/app/orders/${razorpay_order_id}`
       },
-      { new: true }
+      status: 'confirmed',
+      paidAt: new Date(),
+      estimatedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      createdBy: userId
+    });
+
+    // ✅ Clear session data (order created successfully)
+    global.tempOrderSessions.delete(tempOrderId);
+
+    // ✅ Clear cart
+    await Cart.findOneAndUpdate(
+      { userId },
+      { $set: { items: [] } }
     );
 
-    // Clear cart items
-    for (const item of updatedOrder.items) {
-      await Cart.findOneAndUpdate(
-        { userId },
-        { 
-          $pull: { 
-            items: { 
-              productId: item.product,
-              variationId: item.variant
-            }
-          }
-        }
-      );
-    }
-
-    // Update stock
+    // ✅ Update stock
     const stockUpdates = [];
-    for (const item of updatedOrder.items) {
-      const product = await Product.findById(item.product);
-      if (product && item.variant) {
-        const variationIndex = product.variations.findIndex(v => 
-          v._id.toString() === item.variant.toString()
+    for (const item of order.items) {
+      if (item.variant) {
+        stockUpdates.push(
+          Product.findOneAndUpdate(
+            { 
+              _id: item.product,
+              'variations._id': item.variant
+            },
+            { 
+              $inc: { 'variations.$.stock': -item.quantity }
+            }
+          )
         );
-        
-        if (variationIndex !== -1) {
-          stockUpdates.push(
-            Product.findByIdAndUpdate(item.product, {
-              $inc: { [`variations.${variationIndex}.stock`]: -item.quantity }
-            })
-          );
-        }
+      } else {
+        stockUpdates.push(
+          Product.findByIdAndUpdate(item.product, {
+            $inc: { stock: -item.quantity }
+          })
+        );
       }
     }
     await Promise.all(stockUpdates);
 
-    // Update coupon usage
-    if (updatedOrder.couponCode && updatedOrder.discountAmount > 0) {
-      const coupon = await Coupon.findOne({ code: updatedOrder.couponCode });
+    // ✅ Update coupon usage if applicable
+    if (order.couponCode && order.discountAmount > 0 && sessionData.couponData) {
+      const coupon = await Coupon.findOne({ code: order.couponCode });
       if (coupon) {
-        const existingEntry = coupon.usedBy.find(entry => 
-          entry.userId?.toString() === userId.toString()
-        );
-        
-        if (!existingEntry) {
-          coupon.usedCount += 1;
-          coupon.usedBy.push({
-            userId,
-            orderId: updatedOrder._id,
-            usedAt: new Date(),
-            orderAmount: updatedOrder.subtotal,
-            discountApplied: updatedOrder.discountAmount
-          });
-          await coupon.save();
-        }
+        coupon.usedCount += 1;
+        coupon.usedBy.push({
+          userId,
+          orderId: order._id,
+          usedAt: new Date(),
+          orderAmount: order.subtotal,
+          discountApplied: order.discountAmount
+        });
+        await coupon.save();
       }
     }
 
-    // Update user stats
+    // ✅ Update user stats
     await User.findByIdAndUpdate(userId, {
-      $push: { orders: updatedOrder._id },
-      $inc: { totalOrders: 1, totalSpent: updatedOrder.total },
+      $push: { orders: order._id },
+      $inc: { totalOrders: 1, totalSpent: order.total },
       lastOrderAt: new Date()
     });
 
-    // Send email notification
+    // ✅ Send email notification
     const user = await User.findById(userId);
-    await emailService.sendOrderConfirmation(updatedOrder, user);
+    await emailService.sendOrderConfirmation(order, user);
 
     res.status(200).json({
       success: true,
-      message: updatedOrder.discountAmount > 0 
-        ? `Payment successful! You saved ₹${updatedOrder.discountAmount}`
+      message: order.discountAmount > 0 
+        ? `Payment successful! You saved ₹${order.discountAmount}`
         : 'Payment successful! Order placed',
       data: {
         orderId: finalOrderId,
         paymentId: razorpay_payment_id,
-        order: updatedOrder
+        order: order
       }
     });
 
   } catch (error) {
     console.error('Error verifying payment:', error);
     
-    // Error होने पर temporary order delete करें
-    if (req.body.orderId) {
-      try {
-        await Order.findByIdAndDelete(req.body.orderId);
-        console.log('Temporary order deleted due to error');
-      } catch (deleteError) {
-        console.error('Failed to delete temporary order:', deleteError);
-      }
+    // ✅ Clean up session data on error
+    if (req.body.tempOrderId && global.tempOrderSessions) {
+      global.tempOrderSessions.delete(req.body.tempOrderId);
     }
     
     res.status(500).json({
