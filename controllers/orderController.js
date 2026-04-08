@@ -2834,6 +2834,104 @@ exports.cancelShipment = async (req, res) => {
 //   }
 // };
 
+// exports.cancelOrder = async (req, res) => {
+//   try {
+//     const { orderId } = req.params;
+//     const userId = req.user.id;
+
+//     const order = await Order.findOne({
+//       _id: orderId,
+//       customer: userId
+//     });
+
+//     if (!order) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Order not found'
+//       });
+//     }
+
+//     if (!['pending', 'confirmed'].includes(order.status)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Order cannot be cancelled at this stage'
+//       });
+//     }
+
+//     // Initiate refund if payment was made
+//     if (order.paymentStatus === 'paid') {
+//       try {
+//         // Create Razorpay refund
+//         const refund = await razorpay.payments.refund(
+//           order.paymentDetails.razorpayPaymentId,
+//           {
+//             amount: Math.round(order.total * 100),
+//             speed: 'normal',
+//             notes: {
+//               reason: 'Order cancelled by customer'
+//             }
+//           }
+//         );
+
+//         order.paymentStatus = 'refunded';
+//         order.refund = {
+//           amount: order.total,
+//           status: 'processed',
+//           processedAt: new Date(),
+//           razorpayRefundId: refund.id
+//         };
+//       } catch (refundError) {
+//         console.error('Refund error:', refundError);
+//         // Continue with cancellation even if refund fails
+//       }
+//     }
+
+//     // Restore product stock
+//     for (const item of order.items) {
+//       const product = await Product.findById(item.product);
+//       if (product) {
+//         // Restore variation stock
+//         if (item.variation && product.variations) {
+//           const variationIndex = product.variations.findIndex(v => 
+//             v._id.toString() === item.variation.toString()
+//           );
+          
+//           if (variationIndex !== -1) {
+//             const updateField = `variations.${variationIndex}.stock`;
+//             await Product.findByIdAndUpdate(item.product, {
+//               $inc: { 
+//                 [updateField]: item.quantity,
+//                 sold: -item.quantity 
+//               }
+//             });
+//           }
+//         } else {
+//           // Restore main product stock
+//           await Product.findByIdAndUpdate(item.product, {
+//             $inc: { 
+//               stock: item.quantity,
+//               sold: -item.quantity 
+//             }
+//           });
+//         }
+//       }
+//     }
+
+//     order.status = 'cancelled';
+//     await order.save();
+
+//     res.status(200).json({
+//       success: true,
+//       message: 'Order cancelled successfully'
+//     });
+//   } catch (error) {
+//     console.error('Error cancelling order:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: error.message || 'Failed to cancel order'
+//     });
+//   }
+// };
 exports.cancelOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -2842,7 +2940,7 @@ exports.cancelOrder = async (req, res) => {
     const order = await Order.findOne({
       _id: orderId,
       customer: userId
-    });
+    }).populate('customer'); // Populate customer details for email
 
     if (!order) {
       return res.status(404).json({
@@ -2861,7 +2959,6 @@ exports.cancelOrder = async (req, res) => {
     // Initiate refund if payment was made
     if (order.paymentStatus === 'paid') {
       try {
-        // Create Razorpay refund
         const refund = await razorpay.payments.refund(
           order.paymentDetails.razorpayPaymentId,
           {
@@ -2882,7 +2979,6 @@ exports.cancelOrder = async (req, res) => {
         };
       } catch (refundError) {
         console.error('Refund error:', refundError);
-        // Continue with cancellation even if refund fails
       }
     }
 
@@ -2890,7 +2986,6 @@ exports.cancelOrder = async (req, res) => {
     for (const item of order.items) {
       const product = await Product.findById(item.product);
       if (product) {
-        // Restore variation stock
         if (item.variation && product.variations) {
           const variationIndex = product.variations.findIndex(v => 
             v._id.toString() === item.variation.toString()
@@ -2906,7 +3001,6 @@ exports.cancelOrder = async (req, res) => {
             });
           }
         } else {
-          // Restore main product stock
           await Product.findByIdAndUpdate(item.product, {
             $inc: { 
               stock: item.quantity,
@@ -2919,6 +3013,14 @@ exports.cancelOrder = async (req, res) => {
 
     order.status = 'cancelled';
     await order.save();
+
+    // ✅ Send cancellation email
+    try {
+      await emailService.sendOrderCancellationEmail(order, order.customer);
+    } catch (emailError) {
+      console.error('Failed to send cancellation email:', emailError);
+      // Don't fail the cancellation if email fails
+    }
 
     res.status(200).json({
       success: true,
@@ -3043,133 +3145,6 @@ exports.getMyOrders = async (req, res, next) => {
   }
 };
 
-// exports.getAllOrders = async (req, res, next) => {
-//   try {
-    
-//     // First, check if orders exist in database without any filters
-//     const totalOrdersInDB = await Order.countDocuments();
-
-//     // Create a base query
-//     let query = Order.find();
-    
-//     // Apply filters manually for debugging
-//     const queryObj = { ...req.query };
-//     const excludedFields = ['page', 'sort', 'limit', 'fields', 'search', 'status', 'paymentStatus', 'dateRange'];
-//     excludedFields.forEach(field => delete queryObj[field]);
-    
-//     // Apply status filter if provided and not 'all'
-//     if (req.query.status && req.query.status !== 'all') {
-//       query = query.where('status').equals(req.query.status);
-//     }
-    
-//     // Apply payment status filter if provided and not 'all'
-//     if (req.query.paymentStatus && req.query.paymentStatus !== 'all') {
-//       query = query.where('paymentStatus').equals(req.query.paymentStatus);
-//     }
-    
-//     // Apply search filter
-//     if (req.query.search) {
-//       const searchRegex = new RegExp(req.query.search, 'i');
-//       query = query.or([
-//         { orderId: searchRegex },
-//         { 'customer.name': searchRegex },
-//         { 'customer.email': searchRegex }
-//       ]);
-//     }
-    
-//     // Apply date range filter
-//     if (req.query.dateRange && req.query.dateRange !== 'all') {
-//       const now = new Date();
-//       let startDate;
-      
-//       switch(req.query.dateRange) {
-//         case 'today':
-//           startDate = new Date(now.setHours(0, 0, 0, 0));
-//           break;
-//         case 'week':
-//           startDate = new Date(now.setDate(now.getDate() - 7));
-//           break;
-//         case 'month':
-//           startDate = new Date(now.setMonth(now.getMonth() - 1));
-//           break;
-//         case 'year':
-//           startDate = new Date(now.setFullYear(now.getFullYear() - 1));
-//           break;
-//         default:
-//           startDate = null;
-//       }
-      
-//       if (startDate) {
-//         query = query.where('createdAt').gte(startDate);
-//       }
-//     }
-    
-//     // Apply sorting
-//     if (req.query.sort) {
-//       const sortBy = req.query.sort.split(',').join(' ');
-//       query = query.sort(sortBy);
-//     } else {
-//       query = query.sort('-createdAt');
-//     }
-    
-//     // Count total before pagination (for pagination info)
-//     const filterQuery = query._conditions;
-    
-//     const total = await Order.countDocuments(filterQuery);
-    
-//     // Apply pagination
-//     const page = parseInt(req.query.page) || 1;
-//     const limit = parseInt(req.query.limit) || 10;
-//     const skip = (page - 1) * limit;
-    
-//     query = query.skip(skip).limit(limit);
-    
-//     // Execute query with population
-//     const orders = await query
-//       .populate('customer', 'name email phone')
-//       .populate('createdBy', 'name email')
-    
-//     // Calculate summary stats for filtered orders
-//     let stats = [];
-//     try {
-//       stats = await Order.aggregate([
-//         { $match: filterQuery },
-//         {
-//           $group: {
-//             _id: null,
-//             totalRevenue: { $sum: '$total' },
-//             totalOrders: { $sum: 1 },
-//             averageOrder: { $avg: '$total' }
-//           }
-//         }
-//       ]);
-//     } catch (statsError) {
-//       console.error('Error calculating stats:', statsError);
-//     }
-    
-//     res.status(200).json({
-//       success: true,
-//       count: orders.length,
-//       total,
-//       summary: stats[0] || { 
-//         totalRevenue: 0, 
-//         totalOrders: total, 
-//         averageOrder: total > 0 ? 
-//           orders.reduce((acc, order) => acc + order.total, 0) / total : 0 
-//       },
-//       pagination: {
-//         page,
-//         limit,
-//         pages: Math.ceil(total / limit)
-//       },
-//       data: orders
-//     });
-    
-//   } catch (error) {
-//     console.error('Error in getAllOrders:', error);
-//     next(error);
-//   }
-// };
 exports.getAllOrders = async (req, res, next) => {
   try {
     // Create a base query
@@ -3623,11 +3598,52 @@ exports.deleteOrder = async (req, res, next) => {
   }
 };
 
+// exports.updateOrderStatus = async (req, res, next) => {
+//   try {
+//     const { status, note } = req.body;
+    
+//     const order = await Order.findById(req.params.id);
+//     if (!order) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Order not found'
+//       });
+//     }
+    
+//     // Add note if provided
+//     if (note) {
+//       order.notes.push({
+//         note,
+//         createdBy: req.user.id
+//       });
+//     }
+    
+//     order.status = status;
+    
+//     // Update deliveredAt if status is delivered
+//     if (status === 'delivered' && !order.deliveredAt) {
+//       order.deliveredAt = new Date();
+//     }
+    
+//     await order.save();
+    
+//     res.status(200).json({
+//       success: true,
+//       message: 'Order status updated successfully',
+//       data: order
+//     });
+//   } catch (error) {
+//     next(error);
+//   }
+// };
+
 exports.updateOrderStatus = async (req, res, next) => {
   try {
     const { status, note } = req.body;
     
-    const order = await Order.findById(req.params.id);
+    const order = await Order.findById(req.params.id)
+      .populate('customer', 'name email'); // Populate customer details
+    
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -3635,11 +3651,15 @@ exports.updateOrderStatus = async (req, res, next) => {
       });
     }
     
+    // Store old status to compare
+    const oldStatus = order.status;
+    
     // Add note if provided
     if (note) {
       order.notes.push({
         note,
-        createdBy: req.user.id
+        createdBy: req.user.id,
+        createdAt: new Date()
       });
     }
     
@@ -3651,6 +3671,17 @@ exports.updateOrderStatus = async (req, res, next) => {
     }
     
     await order.save();
+    
+    // ✅ Send email notification for status change
+    try {
+      // Don't send email if status hasn't changed
+      if (oldStatus !== status) {
+        await emailService.sendOrderStatusUpdateEmail(order, order.customer, oldStatus, status);
+      }
+    } catch (emailError) {
+      console.error('Failed to send status update email:', emailError);
+      // Don't fail the API if email fails
+    }
     
     res.status(200).json({
       success: true,
