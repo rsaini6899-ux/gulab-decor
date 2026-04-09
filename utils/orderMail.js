@@ -166,7 +166,6 @@ getOrderStatusUpdateTemplate(order, user, oldStatus, newStatus, statusDetails) {
           ${item.image ? `<img src="${item.image}" width="50" height="50" style="border-radius: 8px; object-fit: cover;">` : ''}
           <div>
             <strong>${item.name}</strong><br>
-            ${item.color ? `<span style="color: #666; font-size: 12px;">Color: ${item.color}</span><br>` : ''}
             <span style="color: #666; font-size: 12px;">Qty: ${item.quantity} × ₹${item.price}</span>
           </div>
         </div>
@@ -287,7 +286,7 @@ getOrderStatusUpdateTemplate(order, user, oldStatus, newStatus, statusDetails) {
         ` : ''}
 
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${process.env.FRONTEND_URL}/orders/${order._id}" style="background: #607d8b; color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; display: inline-block;">View Order Details</a>
+          <a href="${process.env.FRONTEND_URL}/orders/${order.orderId}" style="background: #607d8b; color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; display: inline-block;">View Order Details</a>
         </div>
 
         <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
@@ -325,7 +324,6 @@ getCancellationEmailTemplate(order, user) {
     <tr>
       <td style="padding: 10px; border-bottom: 1px solid #eee;">
         <strong>${item.name}</strong><br>
-        ${item.color ? `<span style="color: #666;">Color: ${item.color}</span><br>` : ''}
         Qty: ${item.quantity}
       </td>
       <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">
@@ -428,7 +426,6 @@ getCancellationEmailTemplate(order, user) {
         </td>
         <td style="padding: 10px; border-bottom: 1px solid #eee;">
           <strong>${item.name}</strong><br>
-          ${item.color ? `<span style="color: #666;">Color: ${item.color}</span>` : ''}
         </td>
         <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.quantity}</td>
         <td style="padding: 10px; border-bottom: 1px solid #eee;">₹${item.price}</td>
